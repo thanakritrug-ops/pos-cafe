@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#1a1a2e">
+    <meta name="theme-color" content="#004040">
     <title>POS Café Pro — ระบบขายหน้าร้าน</title>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -11,27 +11,27 @@
     <script>
     tailwind.config = {
         theme: { extend: { colors: {
-            gold: { 50:'#fdf8f0', 100:'#f8edd8', 200:'#f0d9ae', 300:'#e5c180', 400:'#d4a556', 500:'#C9A96E', 600:'#b08a4a', 700:'#8d6d38', 800:'#6b5229', 900:'#4a3a1d' },
-            navy: { 50:'#f0f1f5', 100:'#d4d6e0', 200:'#a8abbd', 300:'#7c809a', 400:'#505577', 500:'#2d3250', 600:'#1a1a2e', 700:'#141428', 800:'#0f0f20', 900:'#0a0a18' },
+            teal: { 50:'#E0F7FA', 100:'#E0F7FA', 200:'#B2EBF2', 300:'#80DEEA', 400:'#26C6DA', 500:'#00BFA5', 600:'#00897B', 700:'#00695C', 800:'#004D40', 900:'#00251A' },
+            navy: { 50:'#f0f1f5', 100:'#d4d6e0', 200:'#a8abbd', 300:'#7c809a', 400:'#505577', 500:'#006666', 600:'#004040', 700:'#141428', 800:'#003333', 900:'#0a0a18' },
         }}}
     }
     </script>
     <style>
         * { font-family: 'Sarabun', sans-serif; }
-        body { background: #f5f3ef; }
+        body { background: #F0FDFA; }
 
         /* === LOGIN === */
-        .login-bg { min-height:100vh; background:linear-gradient(135deg,#0f0f20 0%,#1a1a2e 40%,#16213e 100%); display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; }
-        .login-bg::before { content:''; position:absolute; inset:0; background:radial-gradient(circle at 20% 80%, rgba(201,169,110,.12) 0%, transparent 60%), radial-gradient(circle at 80% 20%, rgba(201,169,110,.08) 0%, transparent 50%); }
+        .login-bg { min-height:100vh; background:linear-gradient(135deg,#003333 0%,#004040 40%,#005555 100%); display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; }
+        .login-bg::before { content:''; position:absolute; inset:0; background:radial-gradient(circle at 20% 80%, rgba(0,191,165,.12) 0%, transparent 60%), radial-gradient(circle at 80% 20%, rgba(201,169,110,.08) 0%, transparent 50%); }
         .login-card { background:rgba(255,255,255,0.97); border-radius:20px; padding:48px 40px; width:420px; box-shadow:0 24px 80px rgba(0,0,0,.4), 0 0 0 1px rgba(255,255,255,.1); position:relative; z-index:1; }
-        .login-input { width:100%; padding:14px 16px; border:2px solid #eae7e0; border-radius:10px; font-size:15px; font-family:inherit; transition:all .15s; outline:none; }
-        .login-input:focus { border-color:#C9A96E; box-shadow:0 0 0 3px rgba(201,169,110,.12); }
-        .login-btn { width:100%; padding:16px; background:linear-gradient(135deg,#C9A96E,#b08a4a); color:white; border:none; border-radius:10px; font-size:16px; font-weight:700; cursor:pointer; transition:all .15s; font-family:inherit; }
-        .login-btn:hover { background:linear-gradient(135deg,#b08a4a,#8d6d38); transform:translateY(-1px); box-shadow:0 8px 24px rgba(201,169,110,.4); }
+        .login-input { width:100%; padding:14px 16px; border:2px solid #B2DFDB; border-radius:10px; font-size:15px; font-family:inherit; transition:all .15s; outline:none; }
+        .login-input:focus { border-color:#00BFA5; box-shadow:0 0 0 3px rgba(0,191,165,.12); }
+        .login-btn { width:100%; padding:16px; background:#00BFA5; color:white; border:none; border-radius:10px; font-size:16px; font-weight:700; cursor:pointer; transition:all .15s; font-family:inherit; }
+        .login-btn:hover { background:#00897B; transform:translateY(-1px); box-shadow:0 8px 24px rgba(0,191,165,.4); }
         .login-btn:active { transform:translateY(0); }
-        .login-hint { background:#f8f6f2; border:1px solid #eae7e0; border-radius:8px; padding:10px 14px; margin-top:16px; }
+        .login-hint { background:#E8F5E9; border:1px solid #B2DFDB; border-radius:8px; padding:10px 14px; margin-top:16px; }
         .role-badge { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; }
-        .role-owner { background:#fdf0e0; color:#8d6d38; border:1px solid #e5c180; }
+        .role-owner { background:#E0F7FA; color:#00695C; border:1px solid #80DEEA; }
         .role-manager { background:#e8f4fd; color:#0078d4; border:1px solid #b3d9f5; }
         .role-staff { background:#dff6dd; color:#107c10; border:1px solid #9fd49b; }
 
@@ -48,71 +48,71 @@
         /* === POS === */
         .offline-badge { position:fixed; top:10px; right:10px; background:#ef4444; color:white; padding:5px 15px; border-radius:20px; font-size:12px; z-index:1000; }
         .online-badge { background:#10b981; }
-        .product-card { transition:all .2s ease; border:2px solid #eae7e0; cursor:pointer; }
-        .product-card:hover { box-shadow:0 8px 25px rgba(0,0,0,.1); transform:translateY(-2px); border-color:#C9A96E; }
+        .product-card { transition:all .2s ease; border:2px solid #B2DFDB; cursor:pointer; }
+        .product-card:hover { box-shadow:0 8px 25px rgba(0,0,0,.1); transform:translateY(-2px); border-color:#00BFA5; }
         .product-card:active { transform:scale(.97); }
-        .add-shot-btn { background:linear-gradient(135deg,#C9A96E,#b08a4a); color:white; font-size:10px; padding:2px 8px; border-radius:4px; cursor:pointer; white-space:nowrap; }
+        .add-shot-btn { background:#00BFA5; color:white; font-size:10px; padding:2px 8px; border-radius:4px; cursor:pointer; white-space:nowrap; }
         .add-shot-btn:hover { opacity:.9; }
-        .tab-btn { padding:8px 16px; border-radius:8px 8px 0 0; font-size:12px; cursor:pointer; border:1px solid #e0ddd8; border-bottom:none; background:#f8f6f2; white-space:nowrap; color:#666; transition:all .15s; }
+        .tab-btn { padding:8px 16px; border-radius:8px 8px 0 0; font-size:12px; cursor:pointer; border:1px solid #e0ddd8; border-bottom:none; background:#E8F5E9; white-space:nowrap; color:#666; transition:all .15s; }
         .tab-btn:hover { background:#fff; color:#333; }
-        .tab-btn.active { background:white; font-weight:bold; color:#C9A96E; border-color:#C9A96E; }
+        .tab-btn.active { background:white; font-weight:bold; color:#00BFA5; border-color:#00BFA5; }
         .bar-container { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
         .bar-label { width:140px; font-size:12px; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#555; }
         .bar-track { flex:1; height:24px; background:#f0ede8; border-radius:6px; overflow:hidden; }
-        .bar-fill { height:100%; border-radius:6px; transition:width .6s ease; display:flex; align-items:center; padding-left:8px; background:linear-gradient(135deg,#C9A96E,#d4a556); }
+        .bar-fill { height:100%; border-radius:6px; transition:width .6s ease; display:flex; align-items:center; padding-left:8px; background:linear-gradient(135deg,#00BFA5,#26C6DA); }
         .bar-value { font-size:10px; color:white; font-weight:bold; white-space:nowrap; }
         .signal-star { background:#2d7d5f; color:white; }
         .signal-keep { background:#4a6fa5; color:white; }
-        .signal-warn { background:#C9A96E; color:white; }
+        .signal-warn { background:#00BFA5; color:white; }
         .signal-drop { background:#c0392b; color:white; }
         .period-btn { padding:6px 14px; border:2px solid #e0ddd8; border-radius:8px; font-size:13px; cursor:pointer; background:white; transition:all .15s; }
-        .period-btn:hover { border-color:#C9A96E; background:#fdf8f0; }
-        .period-btn.active { border-color:#C9A96E; background:linear-gradient(135deg,#C9A96E,#b08a4a); color:white; font-weight:bold; }
+        .period-btn:hover { border-color:#00BFA5; background:#E0F7FA; }
+        .period-btn.active { border-color:#00BFA5; background:#00BFA5; color:white; font-weight:bold; }
         .date-input { padding:6px 12px; border:2px solid #e0ddd8; border-radius:8px; font-size:13px; background:white; }
-        .date-input:focus { outline:none; border-color:#C9A96E; }
+        .date-input:focus { outline:none; border-color:#00BFA5; }
         .export-action-btn { padding:10px 20px; border-radius:10px; font-weight:bold; font-size:13px; cursor:pointer; transition:all .15s; display:flex; align-items:center; gap:6px; }
         .export-action-btn:hover { transform:translateY(-1px); box-shadow:0 4px 15px rgba(0,0,0,.12); }
-        .btn-gold { background:linear-gradient(135deg,#C9A96E,#b08a4a); color:white; }
-        .card { background:white; border-radius:12px; border:1px solid #eae7e0; }
-        table thead { background:#f8f6f2; }
+        .btn-gold { background:#00BFA5; color:white; }
+        .card { background:white; border-radius:12px; border:1px solid #B2DFDB; }
+        table thead { background:#E8F5E9; }
         table th { color:#666; font-weight:600; }
-        table tr:hover { background:#fdf8f0; }
-        .pbi-kpi { background:white; border:1px solid #eae7e0; border-radius:8px; padding:16px; position:relative; overflow:hidden; transition:box-shadow .15s; }
+        table tr:hover { background:#E0F7FA; }
+        .pbi-kpi { background:white; border:1px solid #B2DFDB; border-radius:8px; padding:16px; position:relative; overflow:hidden; transition:box-shadow .15s; }
         .pbi-kpi:hover { box-shadow:0 2px 12px rgba(0,0,0,.08); }
         .pbi-kpi::before { content:''; position:absolute; top:0;left:0;right:0; height:3px; }
-        .pbi-kpi.c1::before{background:#0078d4;} .pbi-kpi.c2::before{background:#107c10;} .pbi-kpi.c3::before{background:#C9A96E;} .pbi-kpi.c4::before{background:#8764b8;}
-        .pbi-card { background:white; border:1px solid #eae7e0; border-radius:8px; padding:16px; }
+        .pbi-kpi.c1::before{background:#0078d4;} .pbi-kpi.c2::before{background:#107c10;} .pbi-kpi.c3::before{background:#00BFA5;} .pbi-kpi.c4::before{background:#8764b8;}
+        .pbi-card { background:white; border:1px solid #B2DFDB; border-radius:8px; padding:16px; }
         .pbi-card-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
         .pbi-card-title { font-size:13px; font-weight:700; color:#333; display:flex; align-items:center; gap:6px; }
         .pbi-actions { display:flex; gap:4px; }
-        .pbi-abtn { background:none; border:1px solid #eae7e0; border-radius:4px; padding:3px 10px; font-size:10px; cursor:pointer; color:#888; font-family:inherit; transition:all .15s; }
-        .pbi-abtn:hover { background:#fdf8f0; }
+        .pbi-abtn { background:none; border:1px solid #B2DFDB; border-radius:4px; padding:3px 10px; font-size:10px; cursor:pointer; color:#888; font-family:inherit; transition:all .15s; }
+        .pbi-abtn:hover { background:#E0F7FA; }
         .pbi-abtn.active { background:#0078d4; color:#fff; border-color:#0078d4; }
         .pbi-badge { font-size:10px; font-weight:700; padding:2px 8px; border-radius:10px; }
         .pbi-badge.up{background:#dff6dd;color:#107c10;} .pbi-badge.dn{background:#fde7e9;color:#a4262c;} .pbi-badge.neu{background:#f3f2f1;color:#605e5c;}
-        .pbi-stab { display:inline-flex; padding:5px 14px; font-size:12px; cursor:pointer; border-radius:6px 6px 0 0; transition:all .15s; color:#888; background:#f5f3ef; border:1px solid transparent; border-bottom:none; }
-        .pbi-stab:hover { color:#333; background:#fdf8f0; }
-        .pbi-stab.active { background:white; color:#C9A96E; font-weight:700; border-color:#eae7e0; }
-        .fbtn-dash { background:#faf9f6; border:1px solid #eae7e0; border-radius:14px; padding:4px 12px; font-size:11px; color:#555; cursor:pointer; transition:all .15s; font-family:inherit; }
+        .pbi-stab { display:inline-flex; padding:5px 14px; font-size:12px; cursor:pointer; border-radius:6px 6px 0 0; transition:all .15s; color:#888; background:#F0FDFA; border:1px solid transparent; border-bottom:none; }
+        .pbi-stab:hover { color:#333; background:#E0F7FA; }
+        .pbi-stab.active { background:white; color:#00BFA5; font-weight:700; border-color:#B2DFDB; }
+        .fbtn-dash { background:#F0FDFA; border:1px solid #B2DFDB; border-radius:14px; padding:4px 12px; font-size:11px; color:#555; cursor:pointer; transition:all .15s; font-family:inherit; }
         .fbtn-dash:hover { border-color:#0078d4; color:#0078d4; }
         .fbtn-dash.active { background:#0078d4; border-color:#0078d4; color:#fff; font-weight:600; }
         .dl-row { display:flex; align-items:center; gap:7px; padding:4px; border-radius:4px; cursor:pointer; }
-        .dl-row:hover { background:#f5f3ef; }
+        .dl-row:hover { background:#F0FDFA; }
         .dl-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
         /* Image Upload */
-        .img-upload-zone { border:2px dashed #C9A96E; border-radius:8px; padding:12px; text-align:center; cursor:pointer; transition:all .15s; }
-        .img-upload-zone:hover { background:#fdf8f0; }
+        .img-upload-zone { border:2px dashed #00BFA5; border-radius:8px; padding:12px; text-align:center; cursor:pointer; transition:all .15s; }
+        .img-upload-zone:hover { background:#E0F7FA; }
         /* Menu sidebar improved */
         .nav-item { padding:10px 14px; border-radius:10px; cursor:pointer; font-size:14px; font-weight:500; transition:all .15s; display:flex; align-items:center; gap:10px; }
         .nav-item:hover { background:rgba(255,255,255,.08); }
-        .nav-item.active { background:rgba(201,169,110,.2); color:#C9A96E; }
+        .nav-item.active { background:rgba(0,191,165,.2); color:#00BFA5; }
         .nav-item .nav-icon { font-size:16px; min-width:20px; }
         ::-webkit-scrollbar { width:5px; }
         ::-webkit-scrollbar-thumb { background:#ccc; border-radius:3px; }
         ::-webkit-scrollbar-thumb:hover { background:#aaa; }
     </style>
 </head>
-<body class="bg-[#f5f3ef]">
+<body class="bg-[#F0FDFA]">
 <div id="app"></div>
 <script>
 // ==================== ONLINE STATUS ====================
@@ -172,6 +172,8 @@ class POSApp {
             dashPeriod:'all', dashDate:new Date().toISOString().split('T')[0], dashWeekOffset:0,
             dashMonthKey:`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`,
             dashYear:String(new Date().getFullYear()), dashCompare:false,
+            dashDate2: new Date(Date.now()-7*86400000).toISOString().split('T')[0],
+            dashWeekOffset2: 1, dashMonthKey2: '', dashYear2: String(new Date().getFullYear()-1),
             dashDate2:(()=>{const d=new Date();d.setDate(d.getDate()-1);return d.toISOString().split('T')[0];})(),
             dashWeekOffset2:1,
             dashMonthKey2:(()=>{const d=new Date();d.setMonth(d.getMonth()-1);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;})(),
@@ -189,6 +191,7 @@ class POSApp {
             showReceipt:false, lastOrder:null, loginError:'',
             showUserMgmt:false, showAddUser:false, editUserId:null,
             showImageMgmt:false, imageProduct:null,
+            settingsOpen:false,
         };
 
         let id=1;
@@ -289,10 +292,24 @@ class POSApp {
         this.sweetnessLevels = [{value:0,label:'0%'},{value:25,label:'25%'},{value:50,label:'50%'},{value:75,label:'75%'},{value:100,label:'100%'}];
         // Load product images from localStorage
         this.productImages = JSON.parse(localStorage.getItem('pos_product_images')) || {};
+        // Load logo
+        this.shopLogo = localStorage.getItem('pos_shop_logo') || null;
+        this.shopName = localStorage.getItem('pos_shop_name') || 'POS Café Pro';
         this.loadOrders();
     }
 
     // ==================== IMAGE MANAGEMENT ====================
+    handleLogoFile(file) {
+        if (file.size > 2*1024*1024) { alert('❌ ไฟล์ใหญ่เกิน 2MB'); return; }
+        const reader = new FileReader();
+        reader.onload = e => {
+            this._pendingLogo = e.target.result;
+            const zone = document.getElementById('logo-drop-zone');
+            if (zone) zone.innerHTML = `<img src="${e.target.result}" style="max-height:120px;max-width:100%;border-radius:12px;margin:auto">`;
+        };
+        reader.readAsDataURL(file);
+    }
+
     getProductImage(productId) { return this.productImages[productId] || null; }
     setProductImage(productId, dataUrl) {
         this.productImages[productId] = dataUrl;
@@ -454,10 +471,10 @@ class POSApp {
         return `<div class="login-bg">
             <div class="login-card">
                 <div class="text-center mb-8">
-                    <div class="w-20 h-20 mx-auto mb-4 rounded-2xl overflow-hidden shadow-lg" style="background:linear-gradient(135deg,#C9A96E,#8d6d38)">
-                        <div class="w-full h-full flex items-center justify-center text-4xl">☕</div>
+                    <div class="w-20 h-20 mx-auto mb-4 rounded-2xl overflow-hidden shadow-lg" style="background:#00BFA5">
+                        ${this.shopLogo ? `<img src="${this.shopLogo}" style="width:100%;height:100%;object-fit:cover">` : '<div class="w-full h-full flex items-center justify-center text-4xl">☕</div>'}
                     </div>
-                    <h1 class="text-2xl font-bold text-gray-800">POS Café Pro</h1>
+                    <h1 class="text-2xl font-bold text-gray-800">${this.shopName}</h1>
                     <p class="text-gray-500 text-sm mt-1">ระบบจัดการร้านกาแฟ</p>
                 </div>
 
@@ -475,14 +492,7 @@ class POSApp {
                     <button id="login-btn" class="login-btn mt-2">เข้าสู่ระบบ →</button>
                 </div>
 
-                <div class="login-hint mt-5">
-                    <div class="text-xs font-bold text-gray-500 mb-2">🔑 บัญชีเริ่มต้น (เปลี่ยนได้ในระบบ):</div>
-                    <div class="space-y-1.5">
-                        <div class="flex items-center gap-2 text-xs"><span class="role-badge role-owner">เจ้าของ</span><code class="bg-gray-100 px-1.5 py-0.5 rounded">owner</code><span class="text-gray-400">/</span><code class="bg-gray-100 px-1.5 py-0.5 rounded">owner1234</code></div>
-                        <div class="flex items-center gap-2 text-xs"><span class="role-badge role-manager">ผู้จัดการ</span><code class="bg-gray-100 px-1.5 py-0.5 rounded">manager</code><span class="text-gray-400">/</span><code class="bg-gray-100 px-1.5 py-0.5 rounded">mgr1234</code></div>
-                        <div class="flex items-center gap-2 text-xs"><span class="role-badge role-staff">พนักงาน</span><code class="bg-gray-100 px-1.5 py-0.5 rounded">staff</code><span class="text-gray-400">/</span><code class="bg-gray-100 px-1.5 py-0.5 rounded">staff1234</code></div>
-                    </div>
-                </div>
+
             </div>
         </div>`;
     }
@@ -493,17 +503,19 @@ class POSApp {
         const u=this.auth.currentUser;
         const roleClass={owner:'role-owner',manager:'role-manager',staff:'role-staff'}[u?.role]||'';
         const roleName={owner:'เจ้าของ',manager:'ผู้จัดการ',staff:'พนักงาน'}[u?.role]||'';
-        return `<div class="flex flex-col h-screen" style="width:220px;background:linear-gradient(180deg,#0f0f20 0%,#1a1a2e 60%,#16213e 100%);color:white;flex-shrink:0">
+        return `<div class="flex flex-col h-screen" style="width:220px;background:linear-gradient(180deg,#003333 0%,#004040 60%,#005555 100%);color:white;flex-shrink:0">
             
             <div class="p-5 pb-4">
                 <div class="flex items-center gap-3 mb-5">
-                    <div class="w-10 h-10 rounded-xl flex items-center justify-center text-2xl" style="background:linear-gradient(135deg,#C9A96E,#8d6d38)">☕</div>
-                    <div><div class="font-bold text-sm" style="color:#C9A96E">POS Café Pro</div><div class="text-xs" style="color:#888">ระบบขายหน้าร้าน</div></div>
+                    <div class="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center text-2xl flex-shrink-0" style="background:#00BFA5">
+                        ${this.shopLogo ? `<img src="${this.shopLogo}" style="width:100%;height:100%;object-fit:cover">` : '☕'}
+                    </div>
+                    <div><div class="font-bold text-sm" style="color:#00BFA5">${this.shopName}</div><div class="text-xs" style="color:#888">ระบบขายหน้าร้าน</div></div>
                 </div>
                 
                 <div class="p-3 rounded-xl" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08)">
                     <div class="flex items-center gap-2">
-                        <div class="w-8 h-8 rounded-lg flex items-center justify-center text-lg" style="background:rgba(201,169,110,.2)">👤</div>
+                        <div class="w-8 h-8 rounded-lg flex items-center justify-center text-lg" style="background:rgba(0,191,165,.2)">👤</div>
                         <div class="flex-1 min-w-0"><div class="text-sm font-medium truncate">${u?.name||''}</div><span class="text-xs px-2 py-0.5 rounded-full ${roleClass}">${roleName}</span></div>
                     </div>
                 </div>
@@ -512,12 +524,22 @@ class POSApp {
             <nav class="flex-1 px-3 space-y-1 overflow-y-auto">
                 <div data-view="pos" class="nav-item ${v==='pos'?'active':''}"><span class="nav-icon">🛒</span>ขายหน้าร้าน</div>
                 ${this.auth.can('reports')?`<div data-view="reports" class="nav-item ${v==='reports'?'active':''}"><span class="nav-icon">📊</span>รายงาน & วิเคราะห์</div>`:''}
-                <div class="mt-4 mb-1 px-2 text-xs" style="color:rgba(255,255,255,.3);font-weight:600;letter-spacing:.05em">TOOLS</div>
-                ${this.auth.can('settings')?`<div class="settings-btn nav-item"><span class="nav-icon">📊</span>Google Drive ${this.state.autoExportSheets&&this.state.googleSheetUrl?'<span style="color:#C9A96E;margin-left:auto">●</span>':''}</div>`:''}
-                ${this.auth.can('supabase')?`<div class="supabase-btn nav-item"><span class="nav-icon">☁️</span>Supabase Cloud ${this.state.supabaseUrl?'<span style="color:#10b981;margin-left:auto">●</span>':''}</div>`:''}
-                ${this.auth.can('manage_users')?`<div class="user-mgmt-btn nav-item"><span class="nav-icon">👥</span>จัดการผู้ใช้</div>`:''}
-                ${this.auth.can('demo')?`<div class="demo-btn nav-item"><span class="nav-icon">🧪</span>สร้างข้อมูลจำลอง</div>`:''}
-                ${this.auth.can('clear')?`<div class="clear-all-btn nav-item" style="color:rgba(255,100,100,.7)"><span class="nav-icon">🗑️</span>ล้างข้อมูลทั้งหมด</div>`:''}
+                ${(this.auth.can('settings')||this.auth.can('supabase')||this.auth.can('manage_users')||this.auth.can('demo')||this.auth.can('clear'))?`
+                <div class="mt-4 mb-1">
+                    <button id="settings-toggle" class="w-full flex items-center justify-between px-2 py-1 text-xs font-bold tracking-widest transition" style="color:rgba(255,255,255,.4);letter-spacing:.08em">
+                        <span>⚙️ ตั้งค่า</span>
+                        <span id="settings-arrow" style="font-size:10px;transition:transform .2s">${this.state.settingsOpen?'▲':'▼'}</span>
+                    </button>
+                </div>
+                <div id="settings-menu" style="overflow:hidden;transition:max-height .25s ease;max-height:${this.state.settingsOpen!==false?'300px':'0px'}">
+                    ${this.auth.can('settings')?`<div class="settings-btn nav-item"><span class="nav-icon">📊</span>Google Drive ${this.state.autoExportSheets&&this.state.googleSheetUrl?'<span style="color:#00BFA5;margin-left:auto">●</span>':''}</div>`:''}
+                    ${this.auth.can('supabase')?`<div class="supabase-btn nav-item"><span class="nav-icon">☁️</span>Supabase Cloud ${this.state.supabaseUrl?'<span style="color:#10b981;margin-left:auto">●</span>':''}</div>`:''}
+                    ${this.auth.can('manage_users')?`<div class="user-mgmt-btn nav-item"><span class="nav-icon">👥</span>จัดการผู้ใช้</div>`:''}
+                    ${this.auth.can('demo')?`<div class="demo-btn nav-item"><span class="nav-icon">🧪</span>สร้างข้อมูลจำลอง</div>`:''}
+                    ${this.auth.can('clear')?`<div class="clear-all-btn nav-item" style="color:rgba(255,100,100,.7)"><span class="nav-icon">🗑️</span>ล้างข้อมูลทั้งหมด</div>`:''}
+                </div>
+                `:''}
+
             </nav>
             
             <div class="p-3 pt-0">
@@ -530,11 +552,11 @@ class POSApp {
     renderProducts() {
         const prods=this.getFilteredProducts();
         const isAdmin=this.auth.can('manage_products');
-        return `<div class="flex-1 flex flex-col overflow-hidden" style="background:#f5f3ef">
+        return `<div class="flex-1 flex flex-col overflow-hidden" style="background:#F0FDFA">
             
             <div class="p-3 pb-0">
                 <div class="flex gap-2 bg-white p-2.5 rounded-xl shadow-sm border border-gray-100 flex-wrap">
-                    ${this.categories.map(c=>`<button data-category="${c.id}" class="category-btn px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-sm font-medium transition ${this.state.selectedCategory===c.id?'text-white shadow-md':'bg-gray-50 hover:bg-gold-50 text-gray-600'}" style="${this.state.selectedCategory===c.id?'background:linear-gradient(135deg,#C9A96E,#b08a4a)':''}"><span>${c.icon}</span><span>${c.name}</span></button>`).join('')}
+                    ${this.categories.map(c=>`<button data-category="${c.id}" class="category-btn px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-sm font-medium transition ${this.state.selectedCategory===c.id?'text-white shadow-md':'bg-gray-50 hover:bg-teal-50 text-gray-600'}" style="${this.state.selectedCategory===c.id?'background:#00BFA5':''}"><span>${c.icon}</span><span>${c.name}</span></button>`).join('')}
                 </div>
             </div>
             
@@ -546,7 +568,7 @@ class POSApp {
                         return `<div data-product-id="${p.id}" class="product-card bg-white rounded-xl p-2.5 cursor-pointer relative group" style="min-height:90px">
                             <div class="flex items-center justify-center mb-1" style="height:44px">${imgDisplay}</div>
                             <div class="text-xs font-medium text-center leading-tight text-gray-700 mb-0.5">${p.name}</div>
-                            <div class="text-sm font-bold text-center" style="color:#C9A96E">฿${p.price}</div>
+                            <div class="text-sm font-bold text-center text-gray-800">฿${p.price}</div>
                             ${isAdmin?`<button data-img-product="${p.id}" class="img-upload-btn absolute top-1 right-1 w-6 h-6 bg-white rounded-full shadow text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition border border-gray-200">📷</button>`:''}
                         </div>`;
                     }).join('')}
@@ -591,7 +613,7 @@ class POSApp {
                 +'<div class="flex justify-between text-gray-600"><span>VAT (7%)</span><span>&#x0e3f;'+vat.toFixed(2)+'</span></div>'
                 +'<div class="flex justify-between text-lg font-bold pt-2 border-t border-gray-100 mt-2"><span>รวมสุทธิ</span><span style="color:#107c10">&#x0e3f;'+tot.toFixed(2)+'</span></div>'
                 +'</div>'
-                +'<button class="checkout-btn w-full py-3.5 text-white rounded-xl font-bold text-lg shadow-md transition" style="background:linear-gradient(135deg,#C9A96E,#b08a4a)">ชำระเงิน &#x0e3f;'+tot.toFixed(2)+'</button>'
+                +'<button class="checkout-btn w-full py-3.5 text-white rounded-xl font-bold text-lg shadow-md transition" style="background:#00BFA5">ชำระเงิน &#x0e3f;'+tot.toFixed(2)+'</button>'
                 +'</div>';
         } else {
             bottomHtml = '<div class="p-4 border-t border-gray-100"><button class="checkout-btn w-full py-3.5 rounded-xl font-bold text-lg bg-gray-100 text-gray-400 cursor-not-allowed">ชำระเงิน</button></div>';
@@ -610,7 +632,7 @@ class POSApp {
         return `<div class="fixed inset-0 flex items-center justify-center z-50" id="receipt-overlay" style="background:rgba(0,0,0,.6)">
             <div class="receipt-card" id="receipt-content">
                 
-                <div class="text-center p-6 pb-4" style="background:linear-gradient(135deg,#1a1a2e,#2d3250);color:white;border-radius:16px 16px 0 0">
+                <div class="text-center p-6 pb-4" style="background:linear-gradient(135deg,#004040,#006666);color:white;border-radius:16px 16px 0 0">
                     <div class="text-3xl mb-2">☕</div>
                     <div class="text-xl font-bold">${shopName}</div>
                     <div class="text-xs mt-1" style="color:rgba(255,255,255,.6)">ขอบคุณที่ใช้บริการ</div>
@@ -649,7 +671,7 @@ class POSApp {
                 </div>
                 
                 <div class="p-4 pt-0 flex gap-2 no-print">
-                    <button onclick="window.print()" class="flex-1 py-3 text-white font-bold rounded-xl text-sm" style="background:linear-gradient(135deg,#C9A96E,#b08a4a)">🖨️ พิมพ์ใบเสร็จ</button>
+                    <button onclick="window.print()" class="flex-1 py-3 text-white font-bold rounded-xl text-sm" style="background:#00BFA5">🖨️ พิมพ์ใบเสร็จ</button>
                     <button class="close-receipt-btn flex-1 py-3 font-bold rounded-xl text-sm border-2 border-gray-200 text-gray-600 hover:bg-gray-50">✕ ปิด</button>
                 </div>
             </div>
@@ -667,7 +689,7 @@ class POSApp {
                     <div class="text-gray-500">฿${p.price}</div>
                 </div>
                 <div class="mb-5"><div class="font-semibold mb-3 text-sm text-gray-700">🍯 เลือกระดับความหวาน</div>
-                <div class="grid grid-cols-5 gap-2">${this.sweetnessLevels.map(s=>`<button data-sweet-select="${s.value}" class="p-3 border-2 border-gray-200 rounded-xl hover:border-gold-500 hover:bg-gold-50 transition text-center"><div class="text-sm font-bold">${s.label}</div></button>`).join('')}</div></div>
+                <div class="grid grid-cols-5 gap-2">${this.sweetnessLevels.map(s=>`<button data-sweet-select="${s.value}" class="p-3 border-2 border-gray-200 rounded-xl hover:border-teal-500 hover:bg-teal-50 transition text-center"><div class="text-sm font-bold">${s.label}</div></button>`).join('')}</div></div>
                 <button class="cancel-sweetness w-full py-3 border-2 border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50">ยกเลิก</button>
             </div>
         </div>`;
@@ -686,22 +708,23 @@ class POSApp {
                 </div>
                 
                 <div class="flex border-b border-gray-100 px-5">
-                    <button data-settings-tab="sheets" class="py-3 px-4 text-sm font-medium border-b-2 ${activeTab==='sheets'?'border-gold-500 text-gold-600':'border-transparent text-gray-500'}">📊 Google Sheets</button>
-                    <button data-settings-tab="supabase" class="py-3 px-4 text-sm font-medium border-b-2 ${activeTab==='supabase'?'border-gold-500 text-gold-600':'border-transparent text-gray-500'}">☁️ Supabase</button>
+                    <button data-settings-tab="sheets" class="py-3 px-4 text-sm font-medium border-b-2 ${activeTab==='sheets'?'border-teal-500 text-teal-600':'border-transparent text-gray-500'}">📊 Google Sheets</button>
+                    <button data-settings-tab="supabase" class="py-3 px-4 text-sm font-medium border-b-2 ${activeTab==='supabase'?'border-teal-500 text-teal-600':'border-transparent text-gray-500'}">☁️ Supabase</button>
+                    <button data-settings-tab="logo" class="py-3 px-4 text-sm font-medium border-b-2 ${activeTab==='logo'?'border-teal-500 text-teal-600':'border-transparent text-gray-500'}">🖼️ โลโก้ & ชื่อร้าน</button>
                 </div>
                 <div class="p-5">
                 ${activeTab==='sheets'?`
                     <div class="mb-4 p-3 rounded-lg ${hasUrl?'bg-green-50 border border-green-200':'bg-gray-50 border border-gray-200'}">
                         <span class="text-sm">${hasUrl?'🟢 เชื่อมต่อ Google Sheets แล้ว':'⚪ ยังไม่ได้เชื่อมต่อ'}</span>
                     </div>
-                    <div class="mb-4 p-4 bg-gold-50 border border-gold-200 rounded-xl">
+                    <div class="mb-4 p-4 bg-teal-50 border border-teal-200 rounded-xl">
                         <div class="flex items-center justify-between">
                             <div><div class="font-bold text-sm">⚡ ส่งอัตโนมัติทุกออเดอร์</div><div class="text-xs text-gray-600 mt-0.5">ทุกออเดอร์ส่งไป Sheets ทันที</div></div>
-                            <label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="auto-export-toggle" ${autoOn?'checked':''} ${!hasUrl?'disabled':''} class="sr-only peer"><div class="w-11 h-6 bg-gray-300 peer-checked:bg-gold-500 rounded-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div></label>
+                            <label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="auto-export-toggle" ${autoOn?'checked':''} ${!hasUrl?'disabled':''} class="sr-only peer"><div class="w-11 h-6 bg-gray-300 peer-checked:bg-teal-500 rounded-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div></label>
                         </div>
                     </div>
                     <div class="mb-5"><label class="block text-sm font-bold mb-2">🔗 Google Apps Script URL</label>
-                    <input type="text" id="google-sheet-url" value="${this.state.googleSheetUrl}" placeholder="https://script.google.com/macros/s/xxxxx/exec" class="w-full px-4 py-2.5 border-2 rounded-xl text-sm focus:border-gold-500 focus:outline-none"/></div>
+                    <input type="text" id="google-sheet-url" value="${this.state.googleSheetUrl}" placeholder="https://script.google.com/macros/s/xxxxx/exec" class="w-full px-4 py-2.5 border-2 rounded-xl text-sm focus:border-teal-500 focus:outline-none"/></div>
                     <div class="flex gap-3">
                         <button class="save-settings flex-1 py-3 btn-gold rounded-xl font-bold export-action-btn">💾 บันทึก</button>
                         <button class="test-sheets-btn px-5 py-3 bg-gray-800 text-white rounded-xl font-bold hover:bg-gray-700 transition">🧪 ทดสอบ</button>
@@ -714,9 +737,9 @@ class POSApp {
                     </div>
                     <div class="space-y-4 mb-5">
                         <div><label class="block text-sm font-bold mb-2">🔗 Supabase URL</label>
-                        <input type="text" id="supabase-url" value="${this.state.supabaseUrl}" placeholder="https://xxxx.supabase.co" class="w-full px-4 py-2.5 border-2 rounded-xl text-sm focus:border-gold-500 focus:outline-none"/></div>
+                        <input type="text" id="supabase-url" value="${this.state.supabaseUrl}" placeholder="https://xxxx.supabase.co" class="w-full px-4 py-2.5 border-2 rounded-xl text-sm focus:border-teal-500 focus:outline-none"/></div>
                         <div><label class="block text-sm font-bold mb-2">🔑 Supabase Anon Key</label>
-                        <input type="text" id="supabase-key" value="${this.state.supabaseKey}" placeholder="eyJhbGciOiJIUzI1NiIsInR5c..." class="w-full px-4 py-2.5 border-2 rounded-xl text-sm focus:border-gold-500 focus:outline-none"/></div>
+                        <input type="text" id="supabase-key" value="${this.state.supabaseKey}" placeholder="eyJhbGciOiJIUzI1NiIsInR5c..." class="w-full px-4 py-2.5 border-2 rounded-xl text-sm focus:border-teal-500 focus:outline-none"/></div>
                     </div>
                     <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-5">
                         <div class="font-bold text-sm text-blue-800 mb-2">📋 ขั้นตอนตั้งค่า Supabase</div>
@@ -744,6 +767,34 @@ class POSApp {
                         <button class="close-settings px-5 py-3 border-2 border-gray-200 rounded-xl font-medium">ปิด</button>
                     </div>
                 `:''}
+                ${activeTab==='logo'?`
+                    <div class="space-y-5">
+                        <div class="text-center">
+                            <div class="w-24 h-24 mx-auto rounded-2xl overflow-hidden mb-3 border-2 border-dashed border-gray-300 flex items-center justify-center" style="background:#f8f8f8">
+                                ${this.shopLogo ? `<img src="${this.shopLogo}" style="width:100%;height:100%;object-fit:cover">` : '<span class="text-4xl">☕</span>'}
+                            </div>
+                            <p class="text-xs text-gray-400 mb-3">โลโก้ปัจจุบัน</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold mb-2">🖼️ อัปโหลดโลโก้ใหม่</label>
+                            <div class="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-teal-400 transition cursor-pointer" id="logo-drop-zone">
+                                <div class="text-3xl mb-2">📁</div>
+                                <p class="text-sm text-gray-600 mb-2">คลิกเพื่อเลือกรูป หรือลากวางที่นี่</p>
+                                <p class="text-xs text-gray-400">JPG, PNG, WEBP — ขนาดไม่เกิน 2MB</p>
+                                <input type="file" id="logo-upload" accept="image/*" class="hidden">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold mb-2">🏪 ชื่อร้าน</label>
+                            <input type="text" id="shop-name-input" value="${this.shopName}" placeholder="ชื่อร้านของคุณ" class="w-full px-4 py-2.5 border-2 rounded-xl text-sm focus:border-teal-500 focus:outline-none">
+                        </div>
+                        ${this.shopLogo ? `<button id="remove-logo-btn" class="w-full py-2.5 border-2 border-red-200 text-red-500 rounded-xl text-sm font-medium hover:bg-red-50 transition">🗑️ ลบโลโก้ออก (ใช้ ☕ แทน)</button>` : ''}
+                        <div class="flex gap-3">
+                            <button id="save-logo-btn" class="flex-1 py-3 btn-gold rounded-xl font-bold export-action-btn">💾 บันทึก</button>
+                            <button class="close-settings px-5 py-3 border-2 border-gray-200 rounded-xl font-medium">ปิด</button>
+                        </div>
+                    </div>
+                `:''}
                 </div>
             </div>
         </div>`;
@@ -759,19 +810,19 @@ class POSApp {
                 <div class="flex items-center justify-between p-5 border-b border-gray-100">
                     <h2 class="text-lg font-bold">👥 จัดการผู้ใช้งาน</h2>
                     <div class="flex gap-2">
-                        <button class="add-user-btn px-4 py-2 text-sm font-bold text-white rounded-xl" style="background:linear-gradient(135deg,#C9A96E,#b08a4a)">+ เพิ่มผู้ใช้</button>
+                        <button class="add-user-btn px-4 py-2 text-sm font-bold text-white rounded-xl" style="background:#00BFA5">+ เพิ่มผู้ใช้</button>
                         <button class="close-user-mgmt text-gray-500 hover:text-gray-700 text-2xl">✕</button>
                     </div>
                 </div>
                 <div class="p-5">
                     ${this.state.showAddUser?`
-                    <div class="bg-gold-50 border border-gold-200 rounded-xl p-4 mb-5">
+                    <div class="bg-teal-50 border border-teal-200 rounded-xl p-4 mb-5">
                         <div class="font-bold text-sm mb-3">➕ เพิ่มผู้ใช้ใหม่</div>
                         <div class="grid grid-cols-2 gap-3 mb-3">
-                            <div><label class="text-xs font-bold mb-1 block">ชื่อผู้ใช้</label><input id="new-username" type="text" class="w-full px-3 py-2 border-2 rounded-lg text-sm focus:border-gold-500 focus:outline-none" placeholder="username"></div>
-                            <div><label class="text-xs font-bold mb-1 block">รหัสผ่าน</label><input id="new-password" type="text" class="w-full px-3 py-2 border-2 rounded-lg text-sm focus:border-gold-500 focus:outline-none" placeholder="password"></div>
-                            <div><label class="text-xs font-bold mb-1 block">ชื่อที่แสดง</label><input id="new-name" type="text" class="w-full px-3 py-2 border-2 rounded-lg text-sm focus:border-gold-500 focus:outline-none" placeholder="เช่น สมชาย"></div>
-                            <div><label class="text-xs font-bold mb-1 block">สิทธิ์</label><select id="new-role" class="w-full px-3 py-2 border-2 rounded-lg text-sm focus:border-gold-500 focus:outline-none"><option value="staff">พนักงาน</option><option value="manager">ผู้จัดการ</option><option value="owner">เจ้าของ</option></select></div>
+                            <div><label class="text-xs font-bold mb-1 block">ชื่อผู้ใช้</label><input id="new-username" type="text" class="w-full px-3 py-2 border-2 rounded-lg text-sm focus:border-teal-500 focus:outline-none" placeholder="username"></div>
+                            <div><label class="text-xs font-bold mb-1 block">รหัสผ่าน</label><input id="new-password" type="text" class="w-full px-3 py-2 border-2 rounded-lg text-sm focus:border-teal-500 focus:outline-none" placeholder="password"></div>
+                            <div><label class="text-xs font-bold mb-1 block">ชื่อที่แสดง</label><input id="new-name" type="text" class="w-full px-3 py-2 border-2 rounded-lg text-sm focus:border-teal-500 focus:outline-none" placeholder="เช่น สมชาย"></div>
+                            <div><label class="text-xs font-bold mb-1 block">สิทธิ์</label><select id="new-role" class="w-full px-3 py-2 border-2 rounded-lg text-sm focus:border-teal-500 focus:outline-none"><option value="staff">พนักงาน</option><option value="manager">ผู้จัดการ</option><option value="owner">เจ้าของ</option></select></div>
                         </div>
                         <div class="flex gap-2">
                             <button class="confirm-add-user px-4 py-2 text-sm font-bold text-white rounded-lg" style="background:#107c10">✅ บันทึก</button>
@@ -784,8 +835,8 @@ class POSApp {
                             <th class="px-4 py-2 text-left">ชื่อ</th><th class="px-4 py-2 text-left">Username</th>
                             <th class="px-4 py-2 text-left">สิทธิ์</th><th class="px-4 py-2 text-center">จัดการ</th>
                         </tr></thead>
-                        <tbody>${users.map(u=>`<tr class="border-t ${u.id===this.auth.currentUser?.id?'bg-gold-50':'hover:bg-gray-50'}">
-                            <td class="px-4 py-3 font-medium">${u.name}${u.id===this.auth.currentUser?.id?' <span class="text-xs text-gold-600">(คุณ)</span>':''}</td>
+                        <tbody>${users.map(u=>`<tr class="border-t ${u.id===this.auth.currentUser?.id?'bg-teal-50':'hover:bg-gray-50'}">
+                            <td class="px-4 py-3 font-medium">${u.name}${u.id===this.auth.currentUser?.id?' <span class="text-xs text-teal-600">(คุณ)</span>':''}</td>
                             <td class="px-4 py-3 text-gray-500">${u.username}</td>
                             <td class="px-4 py-3"><span class="role-badge ${roleCls[u.role]||''}">${roleLabel[u.role]||u.role}</span></td>
                             <td class="px-4 py-3 text-center">
@@ -819,7 +870,7 @@ class POSApp {
                     <div class="font-bold text-sm">${p.name}</div>
                     <div class="text-gray-500 text-sm">฿${p.price}</div>
                 </div>
-                ${hasImg?`<div class="mb-4 text-center"><img src="${this.getProductImage(p.id)}" class="w-32 h-32 object-cover rounded-xl mx-auto border-2 border-gold-200"></div>`:''}
+                ${hasImg?`<div class="mb-4 text-center"><img src="${this.getProductImage(p.id)}" class="w-32 h-32 object-cover rounded-xl mx-auto border-2 border-teal-200"></div>`:''}
                 <div class="img-upload-zone mb-4" id="img-drop-zone">
                     <input type="file" id="img-file-input" accept="image/*" class="hidden">
                     <div class="text-2xl mb-1">📷</div>
@@ -828,7 +879,7 @@ class POSApp {
                     <div class="text-xs text-orange-500 mt-1">⚠️ เมื่อ Offline รูปจาก URL จะแสดง Emoji แทน</div>
                 </div>
                 <div class="flex gap-2">
-                    <button class="pick-img-btn flex-1 py-2.5 text-sm font-bold text-white rounded-xl" style="background:linear-gradient(135deg,#C9A96E,#b08a4a)">📂 เลือกรูป</button>
+                    <button class="pick-img-btn flex-1 py-2.5 text-sm font-bold text-white rounded-xl" style="background:#00BFA5">📂 เลือกรูป</button>
                     ${hasImg?`<button class="remove-img-btn px-4 py-2.5 text-sm border-2 border-red-200 text-red-500 rounded-xl font-medium">🗑️ ลบรูป</button>`:''}
                     <button class="close-image-mgmt px-4 py-2.5 text-sm border-2 border-gray-200 rounded-xl">ปิด</button>
                 </div>
@@ -841,13 +892,13 @@ class POSApp {
         return `<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div class="bg-white rounded-2xl p-6 max-w-lg w-full mx-4 shadow-2xl">
                 <div class="flex items-center justify-between mb-4"><h2 class="text-xl font-bold">🧪 สร้างข้อมูลจำลอง</h2><button class="close-demo text-gray-500 hover:text-gray-700 text-2xl">✕</button></div>
-                <div class="bg-amber-50 border border-gold-200 rounded-xl p-3 mb-5"><p class="text-xs text-gold-800">💡 สร้างข้อมูลออเดอร์จำลอง เพื่อทดสอบระบบรายงาน, Dashboard, วิเคราะห์กำไร</p></div>
+                <div class="bg-amber-50 border border-teal-200 rounded-xl p-3 mb-5"><p class="text-xs text-gold-800">💡 สร้างข้อมูลออเดอร์จำลอง เพื่อทดสอบระบบรายงาน, Dashboard, วิเคราะห์กำไร</p></div>
                 <div class="space-y-4 mb-6">
                     <div><label class="block text-sm font-bold mb-2">📅 จำนวนเดือนย้อนหลัง</label>
-                    <div class="flex gap-2">${[1,2,3,6,12].map(m=>`<button data-demo-months="${m}" class="demo-month-btn px-4 py-2 border-2 rounded-xl text-sm font-medium transition ${this.state.demoMonths===m?'border-gold-500 bg-gold-50 text-gold-700':'border-gray-200 hover:border-gold-300'}">${m} เดือน</button>`).join('')}</div></div>
+                    <div class="flex gap-2">${[1,2,3,6,12].map(m=>`<button data-demo-months="${m}" class="demo-month-btn px-4 py-2 border-2 rounded-xl text-sm font-medium transition ${this.state.demoMonths===m?'border-teal-500 bg-teal-50 text-teal-700':'border-gray-200 hover:border-teal-300'}">${m} เดือน</button>`).join('')}</div></div>
                     <div><label class="block text-sm font-bold mb-2">🧾 จำนวนออเดอร์ต่อวัน</label>
-                    <div class="flex gap-2">${[['5-10','น้อย'],['15-30','กลาง'],['30-60','เยอะ'],['60-100','มากๆ']].map(([v,l])=>`<button data-demo-orders="${v}" class="demo-orders-btn px-4 py-2 border-2 rounded-xl text-sm font-medium transition ${this.state.demoOrdersPerDay===v?'border-gold-500 bg-gold-50 text-gold-700':'border-gray-200 hover:border-gold-300'}"><div>${l}</div><div class="text-xs text-gray-400">${v}</div></button>`).join('')}</div></div>
-                    <label class="flex items-center gap-3"><input type="checkbox" id="demo-peak" ${this.state.demoPeakHour?'checked':''} class="w-4 h-4 accent-gold-500"/><span class="text-sm">⏰ จำลอง Peak Hour</span></label>
+                    <div class="flex gap-2">${[['5-10','น้อย'],['15-30','กลาง'],['30-60','เยอะ'],['60-100','มากๆ']].map(([v,l])=>`<button data-demo-orders="${v}" class="demo-orders-btn px-4 py-2 border-2 rounded-xl text-sm font-medium transition ${this.state.demoOrdersPerDay===v?'border-teal-500 bg-teal-50 text-teal-700':'border-gray-200 hover:border-teal-300'}"><div>${l}</div><div class="text-xs text-gray-400">${v}</div></button>`).join('')}</div></div>
+                    <label class="flex items-center gap-3"><input type="checkbox" id="demo-peak" ${this.state.demoPeakHour?'checked':''} class="w-4 h-4 accent-teal-500"/><span class="text-sm">⏰ จำลอง Peak Hour</span></label>
                 </div>
                 <div class="flex gap-3">
                     <button class="generate-demo-btn flex-1 py-3 bg-gray-800 text-white rounded-xl font-bold transition hover:bg-gray-900">🚀 สร้างข้อมูลจำลอง</button>
@@ -865,12 +916,12 @@ class POSApp {
             ? [{id:'dashboard',label:'📈 Dashboard'},{id:'profit',label:'💰 วิเคราะห์กำไร'},{id:'bundle',label:'🎯 จัดชุดโปร'},{id:'stock',label:'📦 วางแผนสต็อก'},{id:'export',label:'📤 ดึงข้อมูล'},{id:'history',label:'📝 ประวัติขาย'}]
             : [{id:'history',label:'📝 ประวัติขาย'}];
         const activeTab = tabs.find(t=>t.id===tab)?tab:tabs[0]?.id;
-        return `<div class="flex-1 p-5 overflow-auto" style="background:#f5f3ef">
+        return `<div class="flex-1 p-5 overflow-auto" style="background:#F0FDFA">
             <div class="max-w-7xl mx-auto">
                 <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
                     <div class="flex items-center gap-3">
                         <h1 class="text-xl font-bold">📊 รายงาน & วิเคราะห์</h1>
-                        ${activeTab!=='export'?`<select id="month-filter" class="px-3 py-1.5 border-2 border-gold-300 rounded-lg bg-white text-sm font-medium"><option value="all" ${this.state.selectedMonth==='all'?'selected':''}>ทั้งหมด</option>${months.map(m=>`<option value="${m}" ${this.state.selectedMonth===m?'selected':''}>${this.getMonthName(m)}</option>`).join('')}</select>`:''}
+                        ${activeTab!=='export'?`<select id="month-filter" class="px-3 py-1.5 border-2 border-teal-300 rounded-lg bg-white text-sm font-medium"><option value="all" ${this.state.selectedMonth==='all'?'selected':''}>ทั้งหมด</option>${months.map(m=>`<option value="${m}" ${this.state.selectedMonth===m?'selected':''}>${this.getMonthName(m)}</option>`).join('')}</select>`:''}
                     </div>
                 </div>
                 <div class="flex gap-1 mb-4 flex-wrap">${tabs.map(t=>`<button data-tab="${t.id}" class="tab-btn ${(activeTab||tab)===t.id?'active':''}">${t.label}</button>`).join('')}</div>
@@ -886,11 +937,11 @@ class POSApp {
         </div>`;
     }
 
-    renderExportTab(){const p=this.state.exportPeriod;const orders=this.getExportOrders();const stats=this.calcExportStats(orders);const label=this.getExportLabel();const availYears=[...new Set(this.state.orders.map(o=>String(new Date(o.timestamp).getFullYear())))].sort().reverse();return`<div class="p-5"><div class="bg-gold-50 border border-gold-200 rounded-xl p-5 mb-6"><h3 class="font-bold text-sm mb-3">📅 เลือกช่วงเวลา</h3><div class="flex gap-2 mb-4">${[{id:'day',label:'📆 รายวัน'},{id:'week',label:'📅 สัปดาห์'},{id:'month',label:'🗓️ รายเดือน'},{id:'year',label:'📊 รายปี'}].map(t=>`<button data-export-period="${t.id}" class="period-btn ${p===t.id?'active':''}">${t.label}</button>`).join('')}</div><div class="flex items-center gap-4 flex-wrap">${p==='day'?`<div class="flex items-center gap-2"><label class="text-sm font-medium">วันที่:</label><input type="date" id="export-date" value="${this.state.exportDate}" class="date-input"/></div><div class="flex gap-1"><button class="date-nav-btn px-3 py-1 bg-white border rounded text-sm" data-date-nav="prev">◀</button><button class="date-nav-btn px-3 py-1 bg-gold-500 text-white rounded text-sm" data-date-nav="today">วันนี้</button><button class="date-nav-btn px-3 py-1 bg-white border rounded text-sm" data-date-nav="next">▶</button></div>`:''} ${p==='week'?`<input type="week" id="export-week" value="${this.state.exportWeek}" class="date-input"/>`:''} ${p==='month'?`<input type="month" id="export-month" value="${this.state.exportMonth}" class="date-input"/>`:''} ${p==='year'?`<select id="export-year" class="date-input">${availYears.map(y=>`<option value="${y}" ${this.state.exportYear===y?'selected':''}>${parseInt(y)+543}</option>`).join('')}</select>`:''}<div class="ml-auto text-sm font-medium text-gold-700">📋 ${label}</div></div></div><div class="grid grid-cols-5 gap-3 mb-6"><div class="bg-white p-4 rounded-xl border text-center"><div class="text-xs text-emerald-800">💰 ยอดขาย</div><div class="text-xl font-bold text-emerald-800">฿${stats.revenue.toFixed(0)}</div></div><div class="bg-white p-4 rounded-xl border text-center"><div class="text-xs text-navy-500">📈 กำไร</div><div class="text-xl font-bold text-navy-500">฿${stats.profit.toFixed(0)}</div></div><div class="bg-white p-4 rounded-xl border text-center"><div class="text-xs text-gray-700">🧾 ออเดอร์</div><div class="text-xl font-bold text-gray-700">${stats.orderCount}</div></div><div class="bg-white p-4 rounded-xl border text-center"><div class="text-xs text-gold-700">📦 ชิ้น</div><div class="text-xl font-bold text-gold-700">${stats.items}</div></div><div class="bg-white p-4 rounded-xl border text-center"><div class="text-xs text-gold-700">% กำไร</div><div class="text-xl font-bold text-gold-700">${stats.margin.toFixed(1)}%</div></div></div><div class="bg-gray-50 rounded-xl p-5 border-2 border-dashed border-gray-300"><h3 class="font-bold text-sm mb-3">📤 ดึงข้อมูลออก</h3><div class="flex gap-3 flex-wrap"><button class="export-period-csv export-action-btn bg-green-500 text-white hover:bg-emerald-800">📥 ดาวน์โหลด CSV</button><button class="export-period-sheets export-action-btn bg-blue-500 text-white hover:bg-navy-600">📊 ส่งไป Google Drive</button></div><div class="text-xs text-gray-500 mt-3">💡 ข้อมูลที่จะ Export: <strong>${label}</strong> (${orders.length} ออเดอร์)</div></div></div>`;}
+    renderExportTab(){const p=this.state.exportPeriod;const orders=this.getExportOrders();const stats=this.calcExportStats(orders);const label=this.getExportLabel();const availYears=[...new Set(this.state.orders.map(o=>String(new Date(o.timestamp).getFullYear())))].sort().reverse();return`<div class="p-5"><div class="bg-teal-50 border border-teal-200 rounded-xl p-5 mb-6"><h3 class="font-bold text-sm mb-3">📅 เลือกช่วงเวลา</h3><div class="flex gap-2 mb-4">${[{id:'day',label:'📆 รายวัน'},{id:'week',label:'📅 สัปดาห์'},{id:'month',label:'🗓️ รายเดือน'},{id:'year',label:'📊 รายปี'}].map(t=>`<button data-export-period="${t.id}" class="period-btn ${p===t.id?'active':''}">${t.label}</button>`).join('')}</div><div class="flex items-center gap-4 flex-wrap">${p==='day'?`<div class="flex items-center gap-2"><label class="text-sm font-medium">วันที่:</label><input type="date" id="export-date" value="${this.state.exportDate}" class="date-input"/></div><div class="flex gap-1"><button class="date-nav-btn px-3 py-1 bg-white border rounded text-sm" data-date-nav="prev">◀</button><button class="date-nav-btn px-3 py-1 bg-teal-500 text-white rounded text-sm" data-date-nav="today">วันนี้</button><button class="date-nav-btn px-3 py-1 bg-white border rounded text-sm" data-date-nav="next">▶</button></div>`:''} ${p==='week'?`<input type="week" id="export-week" value="${this.state.exportWeek}" class="date-input"/>`:''} ${p==='month'?`<input type="month" id="export-month" value="${this.state.exportMonth}" class="date-input"/>`:''} ${p==='year'?`<select id="export-year" class="date-input">${availYears.map(y=>`<option value="${y}" ${this.state.exportYear===y?'selected':''}>${parseInt(y)+543}</option>`).join('')}</select>`:''}<div class="ml-auto text-sm font-medium text-teal-700">📋 ${label}</div></div></div><div class="grid grid-cols-5 gap-3 mb-6"><div class="bg-white p-4 rounded-xl border text-center"><div class="text-xs text-emerald-800">💰 ยอดขาย</div><div class="text-xl font-bold text-emerald-800">฿${stats.revenue.toFixed(0)}</div></div><div class="bg-white p-4 rounded-xl border text-center"><div class="text-xs text-navy-500">📈 กำไร</div><div class="text-xl font-bold text-navy-500">฿${stats.profit.toFixed(0)}</div></div><div class="bg-white p-4 rounded-xl border text-center"><div class="text-xs text-gray-700">🧾 ออเดอร์</div><div class="text-xl font-bold text-gray-700">${stats.orderCount}</div></div><div class="bg-white p-4 rounded-xl border text-center"><div class="text-xs text-teal-700">📦 ชิ้น</div><div class="text-xl font-bold text-teal-700">${stats.items}</div></div><div class="bg-white p-4 rounded-xl border text-center"><div class="text-xs text-teal-700">% กำไร</div><div class="text-xl font-bold text-teal-700">${stats.margin.toFixed(1)}%</div></div></div><div class="bg-gray-50 rounded-xl p-5 border-2 border-dashed border-gray-300"><h3 class="font-bold text-sm mb-3">📤 ดึงข้อมูลออก</h3><div class="flex gap-3 flex-wrap"><button class="export-period-csv export-action-btn bg-green-500 text-white hover:bg-emerald-800">📥 ดาวน์โหลด CSV</button><button class="export-period-sheets export-action-btn bg-blue-500 text-white hover:bg-navy-600">📊 ส่งไป Google Drive</button></div><div class="text-xs text-gray-500 mt-3">💡 ข้อมูลที่จะ Export: <strong>${label}</strong> (${orders.length} ออเดอร์)</div></div></div>`;}
 
     renderProfitTab(){const a=this.getProductAnalytics();if(!a.length)return'<div class="p-8 text-center text-gray-400">ยังไม่มีข้อมูล</div>';const mxQ=Math.max(...a.map(p=>p.quantity)),mxP=Math.max(...a.map(p=>p.profitPerUnit));const cl=a.map(p=>({...p,signal:this.classifyProduct(p,mxQ,mxP)}));const stars=cl.filter(p=>p.signal.label.includes('Star')),reviews=cl.filter(p=>p.signal.label.includes('Review'));return`<div class="p-5"><div class="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-5"><h3 class="font-bold text-sm mb-2">💡 BCG Matrix</h3><div class="grid grid-cols-4 gap-3 text-xs"><div class="flex items-center gap-2"><span class="px-2 py-1 rounded signal-star text-xs">⭐ Star</span> ขายดี+กำไรสูง</div><div class="flex items-center gap-2"><span class="px-2 py-1 rounded signal-keep text-xs">🔄 Volume</span> ขายดีกำไรน้อย</div><div class="flex items-center gap-2"><span class="px-2 py-1 rounded signal-warn text-xs">💎 Niche</span> กำไรสูงขายน้อย</div><div class="flex items-center gap-2"><span class="px-2 py-1 rounded signal-drop text-xs">⚠️ Review</span> พิจารณาเลิก</div></div></div><div class="overflow-x-auto"><table class="w-full text-xs"><thead class="bg-gray-50"><tr><th class="px-3 py-2 text-left">สัญญาณ</th><th class="px-3 py-2 text-left">สินค้า</th><th class="px-3 py-2 text-left">หมวด</th><th class="px-3 py-2 text-right">จำนวน</th><th class="px-3 py-2 text-right">รายได้</th><th class="px-3 py-2 text-right">กำไร/ชิ้น</th><th class="px-3 py-2 text-right">%กำไร</th><th class="px-3 py-2 text-right">กำไรรวม</th></tr></thead><tbody>${cl.sort((a,b)=>{const o={'⭐ Star':0,'🔄 Volume':1,'💎 Niche':2,'⚠️ Review':3};return(o[a.signal.label]||9)-(o[b.signal.label]||9)||b.profit-a.profit;}).map(p=>`<tr class="border-t hover:bg-gray-50"><td class="px-3 py-2"><span class="px-2 py-0.5 rounded text-xs ${p.signal.cls}">${p.signal.label}</span></td><td class="px-3 py-2 font-medium">${p.name}</td><td class="px-3 py-2 text-gray-500">${this.getCategoryName(p.category)}</td><td class="px-3 py-2 text-right">${p.quantity}</td><td class="px-3 py-2 text-right">฿${p.revenue.toFixed(0)}</td><td class="px-3 py-2 text-right font-bold ${p.profitPerUnit>=30?'text-emerald-700':p.profitPerUnit>=20?'text-blue-600':'text-red-500'}">฿${p.profitPerUnit.toFixed(0)}</td><td class="px-3 py-2 text-right">${p.profitMargin.toFixed(1)}%</td><td class="px-3 py-2 text-right font-bold text-emerald-700">฿${p.profit.toFixed(0)}</td></tr>`).join('')}</tbody></table></div><div class="grid grid-cols-2 gap-6 mt-6"><div class="bg-green-50 border border-green-200 rounded-xl p-4"><h4 class="font-bold text-sm text-green-800 mb-2">✅ ควรโฟกัส (${stars.length})</h4><div class="text-xs text-emerald-800 space-y-1">${stars.slice(0,5).map(p=>`<div>• <strong>${p.name}</strong> — กำไร/ชิ้น ฿${p.profitPerUnit.toFixed(0)}, ขาย ${p.quantity}</div>`).join('')}${!stars.length?'<div class="text-gray-400">ยังไม่มีข้อมูล</div>':''}</div></div><div class="bg-red-50 border border-red-200 rounded-xl p-4"><h4 class="font-bold text-sm text-red-800 mb-2">⚠️ พิจารณาเลิก (${reviews.length})</h4><div class="text-xs text-red-700 space-y-1">${reviews.slice(0,5).map(p=>`<div>• <strong>${p.name}</strong> — กำไร/ชิ้น ฿${p.profitPerUnit.toFixed(0)}, ขายแค่ ${p.quantity}</div>`).join('')}${!reviews.length?'<div class="text-gray-400">ยังไม่มีข้อมูล</div>':''}</div></div></div></div>`;}
 
-    renderBundleTab(){const b=this.getBundleSuggestions();const a=this.getProductAnalytics();if(!a.length)return'<div class="p-8 text-center text-gray-400">ยังไม่มีข้อมูล</div>';return`<div class="p-5"><div class="bg-purple-50 border border-purple-200 rounded-xl p-4 mb-5"><h3 class="font-bold text-sm mb-1">🎯 จับคู่สินค้าขายดี + ขายช้า (ลด 10%)</h3></div>${!b.length?'<div class="text-center py-8 text-gray-400">ยังไม่มีข้อมูลเพียงพอ</div>':`<div class="grid grid-cols-2 gap-4">${b.map((x,i)=>`<div class="border-2 border-dashed border-gold-300 rounded-xl p-4 bg-gold-50"><div class="flex items-center gap-2 mb-3"><div class="w-7 h-7 bg-gold-500 text-white rounded-full flex items-center justify-center text-xs font-bold">${i+1}</div><div class="font-bold text-sm">ชุดที่ ${i+1}</div><span class="ml-auto text-xs px-2 py-1 bg-green-100 text-emerald-800 rounded-full">กำไร ฿${x.bundleProfit.toFixed(0)}</span></div><div class="flex items-center gap-2 mb-2"><div class="flex-1 bg-white rounded-lg p-2 text-center"><div class="text-xs text-gray-500">⭐ ตัวดึง</div><div class="text-xs font-bold">${x.star}</div></div><div class="text-xl">+</div><div class="flex-1 bg-white rounded-lg p-2 text-center"><div class="text-xs text-gray-500">📦 ตัวเสริม</div><div class="text-xs font-bold">${x.slow}</div></div></div><div class="flex items-center justify-between text-xs"><div>ปกติ <span class="line-through text-gray-400">฿${x.originalTotal}</span></div><div class="font-bold text-lg text-gold-600">฿${x.bundlePrice}</div><div class="text-emerald-700">Margin ${x.profitMargin.toFixed(0)}%</div></div></div>`).join('')}</div>`}</div>`;}
+    renderBundleTab(){const b=this.getBundleSuggestions();const a=this.getProductAnalytics();if(!a.length)return'<div class="p-8 text-center text-gray-400">ยังไม่มีข้อมูล</div>';return`<div class="p-5"><div class="bg-purple-50 border border-purple-200 rounded-xl p-4 mb-5"><h3 class="font-bold text-sm mb-1">🎯 จับคู่สินค้าขายดี + ขายช้า (ลด 10%)</h3></div>${!b.length?'<div class="text-center py-8 text-gray-400">ยังไม่มีข้อมูลเพียงพอ</div>':`<div class="grid grid-cols-2 gap-4">${b.map((x,i)=>`<div class="border-2 border-dashed border-teal-300 rounded-xl p-4 bg-teal-50"><div class="flex items-center gap-2 mb-3"><div class="w-7 h-7 bg-teal-500 text-white rounded-full flex items-center justify-center text-xs font-bold">${i+1}</div><div class="font-bold text-sm">ชุดที่ ${i+1}</div><span class="ml-auto text-xs px-2 py-1 bg-green-100 text-emerald-800 rounded-full">กำไร ฿${x.bundleProfit.toFixed(0)}</span></div><div class="flex items-center gap-2 mb-2"><div class="flex-1 bg-white rounded-lg p-2 text-center"><div class="text-xs text-gray-500">⭐ ตัวดึง</div><div class="text-xs font-bold">${x.star}</div></div><div class="text-xl">+</div><div class="flex-1 bg-white rounded-lg p-2 text-center"><div class="text-xs text-gray-500">📦 ตัวเสริม</div><div class="text-xs font-bold">${x.slow}</div></div></div><div class="flex items-center justify-between text-xs"><div>ปกติ <span class="line-through text-gray-400">฿${x.originalTotal}</span></div><div class="font-bold text-lg text-teal-600">฿${x.bundlePrice}</div><div class="text-emerald-700">Margin ${x.profitMargin.toFixed(0)}%</div></div></div>`).join('')}</div>`}</div>`;}
 
     renderStockTab(){const st=this.getStockInsights();if(!st.daily.length)return'<div class="p-8 text-center text-gray-400">ยังไม่มีข้อมูล</div>';return`<div class="p-5"><div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-5"><h3 class="font-bold text-sm mb-1">📦 สต็อกแนะนำ = เฉลี่ย/วัน + Buffer 30%</h3><p class="text-xs text-navy-500">📅 ข้อมูลจาก ${st.daysCount} วัน</p></div>${st.peakHours.length?`<div class="mb-6"><h3 class="font-bold text-sm mb-3">⏰ Peak Hours</h3><div class="flex gap-1 flex-wrap">${Array.from({length:24},(_,h)=>{const f=st.peakHours.find(p=>p.hour===h);const c=f?f.count:0;const mx=st.peakHours[0]?.count||1;const int=c/mx;const bg=int>.7?'bg-red-500 text-white':int>.4?'bg-gold-400 text-white':int>.1?'bg-yellow-200':'bg-gray-100 text-gray-400';return`<div class="w-10 h-10 rounded-lg flex flex-col items-center justify-center text-xs ${bg}"><div class="font-bold">${String(h).padStart(2,'0')}</div><div style="font-size:9px">${c||''}</div></div>`;}).join('')}</div></div>`:''}<div class="overflow-x-auto"><table class="w-full text-xs"><thead class="bg-gray-50"><tr><th class="px-3 py-2 text-left">สินค้า</th><th class="px-3 py-2 text-left">หมวด</th><th class="px-3 py-2 text-right">ขายรวม</th><th class="px-3 py-2 text-right">เฉลี่ย/วัน</th><th class="px-3 py-2 text-right">🎯 สต็อก/วัน</th><th class="px-3 py-2 text-center">ระดับ</th></tr></thead><tbody>${st.daily.slice(0,30).map(d=>{const lv=d.avgPerDay>=5?'🔴 สูง':d.avgPerDay>=2?'🟡 กลาง':'🟢 ต่ำ';return`<tr class="border-t hover:bg-gray-50"><td class="px-3 py-2 font-medium">${d.name}</td><td class="px-3 py-2 text-gray-500">${this.getCategoryName(d.category)}</td><td class="px-3 py-2 text-right">${d.totalQty}</td><td class="px-3 py-2 text-right">${d.avgPerDay.toFixed(1)}</td><td class="px-3 py-2 text-right font-bold text-blue-600">${d.suggestedStock}</td><td class="px-3 py-2 text-center">${lv}</td></tr>`;}).join('')}</tbody></table></div></div>`;}
 
@@ -913,10 +964,13 @@ class POSApp {
         const availMonths=this.getAvailableMonths();
         const availYears=[...new Set(allOrders.map(o=>String(new Date(o.timestamp).getFullYear())))].sort().reverse();
         const availWeeks=this.getAvailableWeeks(allOrders);
-        return`<div><div style="background:#faf9f6;border-bottom:1px solid #eae7e0;padding:10px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:11px;color:#888;font-weight:600">🔽 ช่วงเวลา:</span><div style="display:flex;gap:4px">${[{id:'all',l:'ทั้งหมด'},{id:'day',l:'📆 รายวัน'},{id:'week',l:'📅 สัปดาห์'},{id:'month',l:'🗓 เดือน'},{id:'year',l:'📊 ปี'}].map(t=>`<button data-dash-period="${t.id}" class="fbtn-dash ${dp===t.id?'active':''}">${t.l}</button>`).join('')}</div>${dp!=='all'?`<label style="display:flex;align-items:center;gap:5px;font-size:11px;color:#666;cursor:pointer"><input type="checkbox" id="dash-compare" ${this.state.dashCompare?'checked':''} style="accent-color:#C9A96E"/>🔄 เทียบกัน</label>`:''}</div>
-        ${dp!=='all'?`<div style="background:white;border-bottom:1px solid #eae7e0;padding:8px 20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><div style="flex:1;display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:8px;background:#e8f4fd;border:1px solid #b3d9f5"><span style="font-size:10px;font-weight:700;color:#0078d4">A</span>${dp==='day'?`<input type="date" id="dash-date" value="${this.state.dashDate}" class="date-input" style="font-size:12px"><div style="display:flex;gap:2px"><button class="dash-nav" data-dash-nav="prev-day" style="padding:2px 8px;border:1px solid #ddd;border-radius:4px;font-size:10px;cursor:pointer;background:white">◀</button><button class="dash-nav" data-dash-nav="today" style="padding:2px 8px;border-radius:4px;font-size:10px;cursor:pointer;background:#0078d4;color:white;border:none">วันนี้</button><button class="dash-nav" data-dash-nav="next-day" style="padding:2px 8px;border:1px solid #ddd;border-radius:4px;font-size:10px;cursor:pointer;background:white">▶</button></div>`:''}${dp==='week'?`<select id="dash-week" class="date-input" style="font-size:12px">${availWeeks.map(w=>`<option value="${w.key}" ${w.key===this.state.dashWeekOffset+''?'selected':''}>${w.label}</option>`).join('')}</select>`:''} ${dp==='month'?`<select id="dash-month" class="date-input" style="font-size:12px">${availMonths.map(m=>`<option value="${m}" ${m===this.state.dashMonthKey?'selected':''}>${this.getMonthNameFull(m)}</option>`).join('')}</select>`:''} ${dp==='year'?`<select id="dash-year" class="date-input" style="font-size:12px">${availYears.map(y=>`<option value="${y}" ${y===this.state.dashYear?'selected':''}>${parseInt(y)+543}</option>`).join('')}</select>`:''}</div></div>`:''}
-        <div style="background:white;border-bottom:1px solid #eae7e0;padding:6px 20px;font-size:11px;display:flex;gap:12px"><span style="font-weight:700;color:#0078d4">📅 A: ${periodLabel}</span><span style="color:#888">${orders.length.toLocaleString()} ออเดอร์</span></div>
-        <div class="flex gap-1 px-4 pt-3" style="border-bottom:1px solid #eae7e0">${[{id:'overview',l:'📊 ภาพรวม'},{id:'products',l:'🏆 สินค้า'},{id:'time',l:'⏰ ช่วงเวลา'},{id:'detail',l:'📋 รายละเอียด'}].map(t=>`<button data-dash-sub="${t.id}" class="pbi-stab ${st===t.id?'active':''}">${t.l}</button>`).join('')}</div>
+        return`<div><div style="background:#F0FDFA;border-bottom:1px solid #B2DFDB;padding:10px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:11px;color:#888;font-weight:600">🔽 ช่วงเวลา:</span><div style="display:flex;gap:4px">${[{id:'all',l:'ทั้งหมด'},{id:'day',l:'📆 รายวัน'},{id:'week',l:'📅 สัปดาห์'},{id:'month',l:'🗓 เดือน'},{id:'year',l:'📊 ปี'}].map(t=>`<button data-dash-period="${t.id}" class="fbtn-dash ${dp===t.id?'active':''}">${t.l}</button>`).join('')}</div>${dp!=='all'?`<label style="display:flex;align-items:center;gap:5px;font-size:11px;color:#666;cursor:pointer"><input type="checkbox" id="dash-compare" ${this.state.dashCompare?'checked':''} style="accent-color:#00BFA5"/>🔄 เทียบกัน</label>`:''}</div>
+        ${dp!=='all'?`<div style="background:white;border-bottom:1px solid #B2DFDB;padding:8px 20px;display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><div style="flex:1;display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:8px;background:#e8f4fd;border:1px solid #b3d9f5"><span style="font-size:10px;font-weight:700;color:#0078d4">A</span>${dp==='day'?`<input type="date" id="dash-date" value="${this.state.dashDate}" class="date-input" style="font-size:12px"><div style="display:flex;gap:2px"><button class="dash-nav" data-dash-nav="prev-day" style="padding:2px 8px;border:1px solid #ddd;border-radius:4px;font-size:10px;cursor:pointer;background:white">◀</button><button class="dash-nav" data-dash-nav="today" style="padding:2px 8px;border-radius:4px;font-size:10px;cursor:pointer;background:#0078d4;color:white;border:none">วันนี้</button><button class="dash-nav" data-dash-nav="next-day" style="padding:2px 8px;border:1px solid #ddd;border-radius:4px;font-size:10px;cursor:pointer;background:white">▶</button></div>`:''}${dp==='week'?`<select id="dash-week" class="date-input" style="font-size:12px">${availWeeks.map(w=>`<option value="${w.key}" ${w.key===this.state.dashWeekOffset+''?'selected':''}>${w.label}</option>`).join('')}</select>`:''} ${dp==='month'?`<select id="dash-month" class="date-input" style="font-size:12px">${availMonths.map(m=>`<option value="${m}" ${m===this.state.dashMonthKey?'selected':''}>${this.getMonthNameFull(m)}</option>`).join('')}</select>`:''} ${dp==='year'?`<select id="dash-year" class="date-input" style="font-size:12px">${availYears.map(y=>`<option value="${y}" ${y===this.state.dashYear?'selected':''}>${parseInt(y)+543}</option>`).join('')}</select>`:''}</div></div>
+            ${this.state.dashCompare?`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><div style="flex:1;display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:8px;background:#fdf0e0;border:1px solid #f0c070"><span style="font-size:10px;font-weight:700;color:#d07000">B</span>${dp==='day'?`<input type="date" id="dash-date2" value="${this.state.dashDate2||''}" class="date-input" style="font-size:12px">`:''}${dp==='week'?`<select id="dash-week2" class="date-input" style="font-size:12px">${availWeeks.map(w=>`<option value="${w.key}" ${w.key===(this.state.dashWeekOffset2!=null?this.state.dashWeekOffset2+'':'1')?'selected':''}>${w.label}</option>`).join('')}</select>`:''} ${dp==='month'?`<select id="dash-month2" class="date-input" style="font-size:12px">${availMonths.map(m=>`<option value="${m}" ${m===(this.state.dashMonthKey2||availMonths[1]||availMonths[0])?'selected':''}>${this.getMonthNameFull(m)}</option>`).join('')}</select>`:''} ${dp==='year'?`<select id="dash-year2" class="date-input" style="font-size:12px">${availYears.map(y=>`<option value="${y}" ${y===(this.state.dashYear2||availYears[1]||availYears[0])?'selected':''}>${parseInt(y)+543}</option>`).join('')}</select>`:''}</div></div>`:''}
+        </div>`:''}
+        <div style="background:white;border-bottom:1px solid #B2DFDB;padding:6px 20px;font-size:11px;display:flex;gap:12px"><span style="font-weight:700;color:#0078d4">📅 A: ${periodLabel}</span><span style="color:#888">${orders.length.toLocaleString()} ออเดอร์</span></div>
+        <div class="flex gap-1 px-4 pt-3" style="border-bottom:1px solid #B2DFDB">${[{id:'overview',l:'📊 ภาพรวม'},{id:'products',l:'🏆 สินค้า'},{id:'time',l:'⏰ ช่วงเวลา'},{id:'detail',l:'📋 รายละเอียด'}].map(t=>`<button data-dash-sub="${t.id}" class="pbi-stab ${st===t.id?'active':''}">${t.l}</button>`).join('')}</div>
         <div class="p-5">${st==='overview'?this.renderPBIOverview(agg,orders,prevAgg):''}${st==='products'?this.renderPBIProducts(agg,orders):''}${st==='time'?this.renderPBITime(agg):''}${st==='detail'?this.renderPBIDetail(agg):''}</div></div>`;
     }
 
@@ -943,13 +997,13 @@ class POSApp {
         if(this._pbiCharts){Object.values(this._pbiCharts).forEach(c=>{try{c.destroy();}catch(e){}});} this._pbiCharts={};
         const mode=this._pbiLineMode||'rev';
         const lineEl=document.getElementById('pbiLineChart');
-        if(lineEl){const ctx=lineEl.getContext('2d');const labels=agg.daily.map(d=>new Date(d.date+'T12:00:00').toLocaleDateString('th-TH',{day:'numeric',month:'short'}));const data=agg.daily.map(d=>mode==='profit'?d.profit:mode==='orders'?d.orders:d.rev);this._pbiCharts.line=new Chart(ctx,{type:'line',data:{labels,datasets:[{label:mode==='profit'?'กำไร':mode==='orders'?'ออเดอร์':'ยอดขาย',data,borderColor:'#0078d4',backgroundColor:'#0078d410',fill:true,tension:.3,pointRadius:2,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`฿${Math.round(c.parsed.y).toLocaleString()}`}}},scales:{x:{ticks:{font:{size:9},maxTicksLimit:10},grid:{display:false}},y:{ticks:{font:{size:9},callback:v=>'฿'+Math.round(v).toLocaleString()},grid:{color:'#f5f3ef'}}}}});}
+        if(lineEl){const ctx=lineEl.getContext('2d');const labels=agg.daily.map(d=>new Date(d.date+'T12:00:00').toLocaleDateString('th-TH',{day:'numeric',month:'short'}));const data=agg.daily.map(d=>mode==='profit'?d.profit:mode==='orders'?d.orders:d.rev);this._pbiCharts.line=new Chart(ctx,{type:'line',data:{labels,datasets:[{label:mode==='profit'?'กำไร':mode==='orders'?'ออเดอร์':'ยอดขาย',data,borderColor:'#0078d4',backgroundColor:'#0078d410',fill:true,tension:.3,pointRadius:2,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`฿${Math.round(c.parsed.y).toLocaleString()}`}}},scales:{x:{ticks:{font:{size:9},maxTicksLimit:10},grid:{display:false}},y:{ticks:{font:{size:9},callback:v=>'฿'+Math.round(v).toLocaleString()},grid:{color:'#F0FDFA'}}}}});}
         const donutEl=document.getElementById('pbiDonutChart');
         if(donutEl){const ctx=donutEl.getContext('2d');const cats=Object.values(agg.catMap);const mode2=this._pbiDonutMode||'rev';this._pbiCharts.donut=new Chart(ctx,{type:'doughnut',data:{labels:cats.map(c=>c.name),datasets:[{data:cats.map(c=>mode2==='qty'?c.qty:c.rev),backgroundColor:cats.map(c=>c.color),borderWidth:2,borderColor:'white'}]},options:{responsive:false,plugins:{legend:{display:false}}}});}
         const barEl=document.getElementById('pbiBarChart');
-        if(barEl){const ctx=barEl.getContext('2d');const labels=agg.daily.map(d=>new Date(d.date+'T12:00:00').toLocaleDateString('th-TH',{day:'numeric',month:'short'}));this._pbiCharts.bar=new Chart(ctx,{type:'bar',data:{labels,datasets:[{label:'ยอดขาย',data:agg.daily.map(d=>d.rev),backgroundColor:'#C9A96E55',borderColor:'#C9A96E',borderWidth:1},{label:'กำไร',data:agg.daily.map(d=>d.profit),backgroundColor:'#107c1055',borderColor:'#107c10',borderWidth:1}]},options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{labels:{font:{size:9}}}},scales:{x:{ticks:{font:{size:9},maxTicksLimit:14},grid:{display:false}},y:{ticks:{font:{size:9},callback:v=>'฿'+Math.round(v).toLocaleString()},grid:{color:'#f5f3ef'}}}}});}
+        if(barEl){const ctx=barEl.getContext('2d');const labels=agg.daily.map(d=>new Date(d.date+'T12:00:00').toLocaleDateString('th-TH',{day:'numeric',month:'short'}));this._pbiCharts.bar=new Chart(ctx,{type:'bar',data:{labels,datasets:[{label:'ยอดขาย',data:agg.daily.map(d=>d.rev),backgroundColor:'#00BFA555',borderColor:'#00BFA5',borderWidth:1},{label:'กำไร',data:agg.daily.map(d=>d.profit),backgroundColor:'#107c1055',borderColor:'#107c10',borderWidth:1}]},options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{labels:{font:{size:9}}}},scales:{x:{ticks:{font:{size:9},maxTicksLimit:14},grid:{display:false}},y:{ticks:{font:{size:9},callback:v=>'฿'+Math.round(v).toLocaleString()},grid:{color:'#F0FDFA'}}}}});}
         const timeEl=document.getElementById('pbiTimeChart');
-        if(timeEl){const ctx=timeEl.getContext('2d');const hrs=Array.from({length:24},(_,h)=>h);const data=hrs.map(h=>{const f=agg.hourly.find(x=>x.hour===h);return f?f.orders:0;});this._pbiCharts.time=new Chart(ctx,{type:'bar',data:{labels:hrs.map(h=>`${String(h).padStart(2,'0')}:00`),datasets:[{label:'ออเดอร์',data,backgroundColor:data.map(v=>v===Math.max(...data)?'#C9A96E':'#e0ddd8'),borderRadius:4}]},options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:8},maxTicksLimit:12},grid:{display:false}},y:{ticks:{font:{size:9},stepSize:1},grid:{color:'#f5f3ef'}}}}});}
+        if(timeEl){const ctx=timeEl.getContext('2d');const hrs=Array.from({length:24},(_,h)=>h);const data=hrs.map(h=>{const f=agg.hourly.find(x=>x.hour===h);return f?f.orders:0;});this._pbiCharts.time=new Chart(ctx,{type:'bar',data:{labels:hrs.map(h=>`${String(h).padStart(2,'0')}:00`),datasets:[{label:'ออเดอร์',data,backgroundColor:data.map(v=>v===Math.max(...data)?'#00BFA5':'#e0ddd8'),borderRadius:4}]},options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:8},maxTicksLimit:12},grid:{display:false}},y:{ticks:{font:{size:9},stepSize:1},grid:{color:'#F0FDFA'}}}}});}
     }
 
     // ==================== DEMO DATA GENERATOR ====================
@@ -1005,6 +1059,29 @@ class POSApp {
         const ca=document.querySelector('.clear-all-btn');if(ca)ca.addEventListener('click',()=>this.clearAllData());
         const um=document.querySelector('.user-mgmt-btn');if(um)um.addEventListener('click',()=>{this.state.showUserMgmt=true;this.render();});
         const lo=document.querySelector('.logout-btn');if(lo)lo.addEventListener('click',()=>{this.auth.logout();this.state.loginError='';this.render();});
+        // Settings toggle
+        // Logo upload
+        const logoZone = document.getElementById('logo-drop-zone');
+        const logoInput = document.getElementById('logo-upload');
+        if (logoZone && logoInput) {
+            logoZone.addEventListener('click', () => logoInput.click());
+            logoZone.addEventListener('dragover', e => { e.preventDefault(); logoZone.style.borderColor='#00BFA5'; });
+            logoZone.addEventListener('dragleave', () => logoZone.style.borderColor='');
+            logoZone.addEventListener('drop', e => { e.preventDefault(); const file=e.dataTransfer.files[0]; if(file) this.handleLogoFile(file); });
+            logoInput.addEventListener('change', e => { if(e.target.files[0]) this.handleLogoFile(e.target.files[0]); });
+        }
+        const saveLogoBtn = document.getElementById('save-logo-btn');
+        if (saveLogoBtn) saveLogoBtn.addEventListener('click', () => {
+            const name = document.getElementById('shop-name-input')?.value.trim();
+            if (name) { this.shopName = name; localStorage.setItem('pos_shop_name', name); }
+            if (this._pendingLogo !== undefined) { this.shopLogo = this._pendingLogo; if(this._pendingLogo) localStorage.setItem('pos_shop_logo', this._pendingLogo); else localStorage.removeItem('pos_shop_logo'); this._pendingLogo = undefined; }
+            this.state.showSettings = false; this.render(); alert('✅ บันทึกโลโก้และชื่อร้านแล้ว!');
+        });
+        const removeLogoBtn = document.getElementById('remove-logo-btn');
+        if (removeLogoBtn) removeLogoBtn.addEventListener('click', () => { this._pendingLogo = null; this.shopLogo = null; localStorage.removeItem('pos_shop_logo'); this.render(); });
+        // Settings toggle
+        const stog=document.getElementById('settings-toggle');
+        if(stog)stog.addEventListener('click',()=>{this.state.settingsOpen=!this.state.settingsOpen;const menu=document.getElementById('settings-menu');const arrow=document.getElementById('settings-arrow');if(menu)menu.style.maxHeight=this.state.settingsOpen?'300px':'0px';if(arrow)arrow.style.transform=this.state.settingsOpen?'rotate(180deg)':'rotate(0deg)';});
         // Settings modal tabs
         document.querySelectorAll('[data-settings-tab]').forEach(el=>el.addEventListener('click',e=>{this.state.settingsTab=e.currentTarget.dataset.settingsTab;this.render();}));
         document.querySelectorAll('.close-settings').forEach(b=>b.addEventListener('click',()=>{this.state.showSettings=false;this.render();}));
@@ -1040,9 +1117,13 @@ class POSApp {
         document.querySelectorAll('[data-dash-sub]').forEach(el=>el.addEventListener('click',e=>{this.state.dashSubTab=e.currentTarget.dataset.dashSub;this.render();}));
         document.querySelectorAll('[data-dash-period]').forEach(el=>el.addEventListener('click',e=>{this.state.dashPeriod=e.currentTarget.dataset.dashPeriod;this.render();}));
         const dd=document.getElementById('dash-date');if(dd)dd.addEventListener('change',e=>{this.state.dashDate=e.target.value;this.render();});
+        const dd2=document.getElementById('dash-date2');if(dd2)dd2.addEventListener('change',e=>{this.state.dashDate2=e.target.value;this.render();});
         const dw=document.getElementById('dash-week');if(dw)dw.addEventListener('change',e=>{this.state.dashWeekOffset=parseInt(e.target.value);this.render();});
+        const dw2=document.getElementById('dash-week2');if(dw2)dw2.addEventListener('change',e=>{this.state.dashWeekOffset2=parseInt(e.target.value);this.render();});
         const dm=document.getElementById('dash-month');if(dm)dm.addEventListener('change',e=>{this.state.dashMonthKey=e.target.value;this.render();});
+        const dm2=document.getElementById('dash-month2');if(dm2)dm2.addEventListener('change',e=>{this.state.dashMonthKey2=e.target.value;this.render();});
         const dy=document.getElementById('dash-year');if(dy)dy.addEventListener('change',e=>{this.state.dashYear=e.target.value;this.render();});
+        const dy2=document.getElementById('dash-year2');if(dy2)dy2.addEventListener('change',e=>{this.state.dashYear2=e.target.value;this.render();});
         const dc=document.getElementById('dash-compare');if(dc)dc.addEventListener('change',e=>{this.state.dashCompare=e.target.checked;this.render();});
         document.querySelectorAll('.dash-nav').forEach(el=>el.addEventListener('click',e=>{const nav=e.currentTarget.dataset.dashNav;if(nav==='prev-day'){const d=new Date(this.state.dashDate);d.setDate(d.getDate()-1);this.state.dashDate=d.toISOString().split('T')[0];}if(nav==='next-day'){const d=new Date(this.state.dashDate);d.setDate(d.getDate()+1);this.state.dashDate=d.toISOString().split('T')[0];}if(nav==='today')this.state.dashDate=new Date().toISOString().split('T')[0];this.render();}));
         document.querySelectorAll('[data-dtop-cat]').forEach(el=>el.addEventListener('click',e=>{this.state.dashTopCat=e.currentTarget.dataset.dtopCat;this.render();}));
