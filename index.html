@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1a1a2e">
+    <title>POS Café Pro — ระบบขายหน้าร้าน</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <script>
+    tailwind.config = {
+        theme: { extend: { colors: {
+            gold: { 50:'#fdf8f0', 100:'#f8edd8', 200:'#f0d9ae', 300:'#e5c180', 400:'#d4a556', 500:'#C9A96E', 600:'#b08a4a', 700:'#8d6d38', 800:'#6b5229', 900:'#4a3a1d' },
+            navy: { 50:'#f0f1f5', 100:'#d4d6e0', 200:'#a8abbd', 300:'#7c809a', 400:'#505577', 500:'#2d3250', 600:'#1a1a2e', 700:'#141428', 800:'#0f0f20', 900:'#0a0a18' },
+        }}}
+    }
+    </script>
+    <style>
+        * { font-family: 'Sarabun', sans-serif; }
+        body { background: #f5f3ef; }
+
+        /* === LOGIN === */
+        .login-bg { min-height:100vh; background:linear-gradient(135deg,#0f0f20 0%,#1a1a2e 40%,#16213e 100%); display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; }
+        .login-bg::before { content:''; position:absolute; inset:0; background:radial-gradient(circle at 20% 80%, rgba(201,169,110,.12) 0%, transparent 60%), radial-gradient(circle at 80% 20%, rgba(201,169,110,.08) 0%, transparent 50%); }
+        .login-card { background:rgba(255,255,255,0.97); border-radius:20px; padding:48px 40px; width:420px; box-shadow:0 24px 80px rgba(0,0,0,.4), 0 0 0 1px rgba(255,255,255,.1); position:relative; z-index:1; }
+        .login-input { width:100%; padding:14px 16px; border:2px solid #eae7e0; border-radius:10px; font-size:15px; font-family:inherit; transition:all .15s; outline:none; }
+        .login-input:focus { border-color:#C9A96E; box-shadow:0 0 0 3px rgba(201,169,110,.12); }
+        .login-btn { width:100%; padding:16px; background:linear-gradient(135deg,#C9A96E,#b08a4a); color:white; border:none; border-radius:10px; font-size:16px; font-weight:700; cursor:pointer; transition:all .15s; font-family:inherit; }
+        .login-btn:hover { background:linear-gradient(135deg,#b08a4a,#8d6d38); transform:translateY(-1px); box-shadow:0 8px 24px rgba(201,169,110,.4); }
+        .login-btn:active { transform:translateY(0); }
+        .login-hint { background:#f8f6f2; border:1px solid #eae7e0; border-radius:8px; padding:10px 14px; margin-top:16px; }
+        .role-badge { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; }
+        .role-owner { background:#fdf0e0; color:#8d6d38; border:1px solid #e5c180; }
+        .role-manager { background:#e8f4fd; color:#0078d4; border:1px solid #b3d9f5; }
+        .role-staff { background:#dff6dd; color:#107c10; border:1px solid #9fd49b; }
+
+        /* === RECEIPT === */
+        @media print {
+            body > *:not(#receipt-overlay) { display:none !important; }
+            #receipt-overlay { position:static !important; background:none !important; }
+            .receipt-card { box-shadow:none !important; }
+            .no-print { display:none !important; }
+        }
+        .receipt-card { background:white; border-radius:16px; width:380px; max-height:90vh; overflow-y:auto; box-shadow:0 24px 80px rgba(0,0,0,.3); }
+        .receipt-divider { border:none; border-top:2px dashed #e0ddd8; margin:12px 0; }
+
+        /* === POS === */
+        .offline-badge { position:fixed; top:10px; right:10px; background:#ef4444; color:white; padding:5px 15px; border-radius:20px; font-size:12px; z-index:1000; }
+        .online-badge { background:#10b981; }
+        .product-card { transition:all .2s ease; border:2px solid #eae7e0; cursor:pointer; }
+        .product-card:hover { box-shadow:0 8px 25px rgba(0,0,0,.1); transform:translateY(-2px); border-color:#C9A96E; }
+        .product-card:active { transform:scale(.97); }
+        .add-shot-btn { background:linear-gradient(135deg,#C9A96E,#b08a4a); color:white; font-size:10px; padding:2px 8px; border-radius:4px; cursor:pointer; white-space:nowrap; }
+        .add-shot-btn:hover { opacity:.9; }
+        .tab-btn { padding:8px 16px; border-radius:8px 8px 0 0; font-size:12px; cursor:pointer; border:1px solid #e0ddd8; border-bottom:none; background:#f8f6f2; white-space:nowrap; color:#666; transition:all .15s; }
+        .tab-btn:hover { background:#fff; color:#333; }
+        .tab-btn.active { background:white; font-weight:bold; color:#C9A96E; border-color:#C9A96E; }
+        .bar-container { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+        .bar-label { width:140px; font-size:12px; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#555; }
+        .bar-track { flex:1; height:24px; background:#f0ede8; border-radius:6px; overflow:hidden; }
+        .bar-fill { height:100%; border-radius:6px; transition:width .6s ease; display:flex; align-items:center; padding-left:8px; background:linear-gradient(135deg,#C9A96E,#d4a556); }
+        .bar-value { font-size:10px; color:white; font-weight:bold; white-space:nowrap; }
+        .signal-star { background:#2d7d5f; color:white; }
+        .signal-keep { background:#4a6fa5; color:white; }
+        .signal-warn { background:#C9A96E; color:white; }
+        .signal-drop { background:#c0392b; color:white; }
+        .period-btn { padding:6px 14px; border:2px solid #e0ddd8; border-radius:8px; font-size:13px; cursor:pointer; background:white; transition:all .15s; }
+        .period-btn:hover { border-color:#C9A96E; background:#fdf8f0; }
+        .period-btn.active { border-color:#C9A96E; background:linear-gradient(135deg,#C9A96E,#b08a4a); color:white; font-weight:bold; }
+        .date-input { padding:6px 12px; border:2px solid #e0ddd8; border-radius:8px; font-size:13px; background:white; }
+        .date-input:focus { outline:none; border-color:#C9A96E; }
+        .export-action-btn { padding:10px 20px; border-radius:10px; font-weight:bold; font-size:13px; cursor:pointer; transition:all .15s; display:flex; align-items:center; gap:6px; }
+        .export-action-btn:hover { transform:translateY(-1px); box-shadow:0 4px 15px rgba(0,0,0,.12); }
+        .btn-gold { background:linear-gradient(135deg,#C9A96E,#b08a4a); color:white; }
+        .card { background:white; border-radius:12px; border:1px solid #eae7e0; }
+        table thead { background:#f8f6f2; }
+        table th { color:#666; font-weight:600; }
+        table tr:hover { background:#fdf8f0; }
+        .pbi-kpi { background:white; border:1px solid #eae7e0; border-radius:8px; padding:16px; position:relative; overflow:hidden; transition:box-shadow .15s; }
+        .pbi-kpi:hover { box-shadow:0 2px 12px rgba(0,0,0,.08); }
+        .pbi-kpi::before { content:''; position:absolute; top:0;left:0;right:0; height:3px; }
+        .pbi-kpi.c1::before{background:#0078d4;} .pbi-kpi.c2::before{background:#107c10;} .pbi-kpi.c3::before{background:#C9A96E;} .pbi-kpi.c4::before{background:#8764b8;}
+        .pbi-card { background:white; border:1px solid #eae7e0; border-radius:8px; padding:16px; }
+        .pbi-card-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+        .pbi-card-title { font-size:13px; font-weight:700; color:#333; display:flex; align-items:center; gap:6px; }
+        .pbi-actions { display:flex; gap:4px; }
+        .pbi-abtn { background:none; border:1px solid #eae7e0; border-radius:4px; padding:3px 10px; font-size:10px; cursor:pointer; color:#888; font-family:inherit; transition:all .15s; }
+        .pbi-abtn:hover { background:#fdf8f0; }
+        .pbi-abtn.active { background:#0078d4; color:#fff; border-color:#0078d4; }
+        .pbi-badge { font-size:10px; font-weight:700; padding:2px 8px; border-radius:10px; }
+        .pbi-badge.up{background:#dff6dd;color:#107c10;} .pbi-badge.dn{background:#fde7e9;color:#a4262c;} .pbi-badge.neu{background:#f3f2f1;color:#605e5c;}
+        .pbi-stab { display:inline-flex; padding:5px 14px; font-size:12px; cursor:pointer; border-radius:6px 6px 0 0; transition:all .15s; color:#888; background:#f5f3ef; border:1px solid transparent; border-bottom:none; }
+        .pbi-stab:hover { color:#333; background:#fdf8f0; }
+        .pbi-stab.active { background:white; color:#C9A96E; font-weight:700; border-color:#eae7e0; }
+        .fbtn-dash { background:#faf9f6; border:1px solid #eae7e0; border-radius:14px; padding:4px 12px; font-size:11px; color:#555; cursor:pointer; transition:all .15s; font-family:inherit; }
+        .fbtn-dash:hover { border-color:#0078d4; color:#0078d4; }
+        .fbtn-dash.active { background:#0078d4; border-color:#0078d4; color:#fff; font-weight:600; }
+        .dl-row { display:flex; align-items:center; gap:7px; padding:4px; border-radius:4px; cursor:pointer; }
+        .dl-row:hover { background:#f5f3ef; }
+        .dl-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+        /* Image Upload */
+        .img-upload-zone { border:2px dashed #C9A96E; border-radius:8px; padding:12px; text-align:center; cursor:pointer; transition:all .15s; }
+        .img-upload-zone:hover { background:#fdf8f0; }
+        /* Menu sidebar improved */
+        .nav-item { padding:10px 14px; border-radius:10px; cursor:pointer; font-size:14px; font-weight:500; transition:all .15s; display:flex; align-items:center; gap:10px; }
+        .nav-item:hover { background:rgba(255,255,255,.08); }
+        .nav-item.active { background:rgba(201,169,110,.2); color:#C9A96E; }
+        .nav-item .nav-icon { font-size:16px; min-width:20px; }
+        ::-webkit-scrollbar { width:5px; }
+        ::-webkit-scrollbar-thumb { background:#ccc; border-radius:3px; }
+        ::-webkit-scrollbar-thumb:hover { background:#aaa; }
+    </style>
+</head>
+<body class="bg-[#f5f3ef]">
+<div id="app"></div>
+<script>
+// ==================== ONLINE STATUS ====================
+function updateOnlineStatus() {
+    let b=document.getElementById('online-badge');
+    if(!b){b=document.createElement('div');b.id='online-badge';document.body.appendChild(b);}
+    b.className=navigator.onLine?'offline-badge online-badge':'offline-badge';
+    b.textContent=navigator.onLine?'🟢 ออนไลน์':'🔴 ออฟไลน์';
+}
+window.addEventListener('online',updateOnlineStatus);
+window.addEventListener('offline',updateOnlineStatus);
+window.addEventListener('load',updateOnlineStatus);
+
+// ==================== AUTH MANAGER ====================
+class AuthManager {
+    constructor() {
+        this._defaultUsers = [
+            {id:1, username:'owner', password:'owner1234', role:'owner', name:'เจ้าของร้าน'},
+            {id:2, username:'manager', password:'mgr1234', role:'manager', name:'ผู้จัดการ'},
+            {id:3, username:'staff', password:'staff1234', role:'staff', name:'พนักงานขาย'},
+        ];
+        this.users = JSON.parse(localStorage.getItem('pos_users')) || this._defaultUsers;
+        this.currentUser = JSON.parse(sessionStorage.getItem('pos_user')) || null;
+    }
+    login(username, password) {
+        const user = this.users.find(u=>u.username===username && u.password===password && u.active!==false);
+        if(user) { this.currentUser = user; sessionStorage.setItem('pos_user', JSON.stringify(user)); return user; }
+        return null;
+    }
+    logout() { this.currentUser = null; sessionStorage.removeItem('pos_user'); }
+    isLoggedIn() { return !!this.currentUser; }
+    can(action) {
+        if(!this.currentUser) return false;
+        const perms = {
+            owner:   ['pos','reports','all_reports','settings','demo','clear','manage_users','manage_products','supabase'],
+            manager: ['pos','reports','all_reports'],
+            staff:   ['pos','own_history'],
+        };
+        return (perms[this.currentUser.role]||[]).includes(action);
+    }
+    get role() { return this.currentUser?.role || null; }
+    get name() { return this.currentUser?.name || ''; }
+    saveUsers() { localStorage.setItem('pos_users', JSON.stringify(this.users)); }
+    addUser(u) { u.id = Date.now(); this.users.push(u); this.saveUsers(); }
+    updateUser(id, data) { const i=this.users.findIndex(u=>u.id===id); if(i>=0){this.users[i]={...this.users[i],...data};this.saveUsers();} }
+    deleteUser(id) { this.users=this.users.filter(u=>u.id!==id); this.saveUsers(); }
+}
+
+// ==================== POS APP ====================
+class POSApp {
+    constructor() {
+        this.auth = new AuthManager();
+        this.state = {
+            selectedCategory:'coffee', cart:[], discount:10, currentView:'pos',
+            orders:[], showSettings:false, showSweetness:false, sweetnessProduct:null,
+            selectedMonth:'all', reportTab:'dashboard', topCategory:'all', dashSubTab:'overview',
+            dashPeriod:'all', dashDate:new Date().toISOString().split('T')[0], dashWeekOffset:0,
+            dashMonthKey:`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`,
+            dashYear:String(new Date().getFullYear()), dashCompare:false,
+            dashDate2:(()=>{const d=new Date();d.setDate(d.getDate()-1);return d.toISOString().split('T')[0];})(),
+            dashWeekOffset2:1,
+            dashMonthKey2:(()=>{const d=new Date();d.setMonth(d.getMonth()-1);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;})(),
+            dashYear2:String(new Date().getFullYear()-1), dashTopCat:'all',
+            exportPeriod:'day', exportDate:new Date().toISOString().split('T')[0],
+            exportWeek:this.getISOWeek(new Date()),
+            exportMonth:`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`,
+            exportYear:String(new Date().getFullYear()),
+            googleSheetUrl:localStorage.getItem('googleSheetUrl')||'',
+            autoExportSheets:localStorage.getItem('autoExportSheets')==='true',
+            supabaseUrl:localStorage.getItem('supabaseUrl')||'',
+            supabaseKey:localStorage.getItem('supabaseKey')||'',
+            showDemoGenerator:false, demoMonths:3, demoOrdersPerDay:'15-30', demoPeakHour:true,
+            // New
+            showReceipt:false, lastOrder:null, loginError:'',
+            showUserMgmt:false, showAddUser:false, editUserId:null,
+            showImageMgmt:false, imageProduct:null,
+        };
+
+        let id=1;
+        this.products = [
+            {id:id++,name:'เอสเพรโซ่ ร้อน',price:40,cost:15,category:'coffee',image:'☕',isDrink:true},
+            {id:id++,name:'เอสเพรโซ่ เย็น',price:50,cost:18,category:'coffee',image:'☕',isDrink:true},
+            {id:id++,name:'เอสเพรโซ่ ปั่น',price:60,cost:22,category:'coffee',image:'☕',isDrink:true},
+            {id:id++,name:'คาปูชิโน่ ร้อน',price:40,cost:15,category:'coffee',image:'☕',isDrink:true},
+            {id:id++,name:'คาปูชิโน่ เย็น',price:50,cost:18,category:'coffee',image:'☕',isDrink:true},
+            {id:id++,name:'คาปูชิโน่ ปั่น',price:60,cost:22,category:'coffee',image:'☕',isDrink:true},
+            {id:id++,name:'มอคค่า ร้อน',price:40,cost:15,category:'coffee',image:'☕',isDrink:true},
+            {id:id++,name:'มอคค่า เย็น',price:50,cost:18,category:'coffee',image:'☕',isDrink:true},
+            {id:id++,name:'มอคค่า ปั่น',price:60,cost:22,category:'coffee',image:'☕',isDrink:true},
+            {id:id++,name:'อเมริกาโน่ ร้อน',price:40,cost:15,category:'coffee',image:'☕',isDrink:true},
+            {id:id++,name:'อเมริกาโน่ เย็น',price:50,cost:18,category:'coffee',image:'☕',isDrink:true},
+            {id:id++,name:'อเมริกาโน่ ปั่น',price:60,cost:22,category:'coffee',image:'☕',isDrink:true},
+            {id:id++,name:'ลาเต้ ร้อน',price:40,cost:15,category:'coffee',image:'☕',isDrink:true},
+            {id:id++,name:'ลาเต้ เย็น',price:50,cost:18,category:'coffee',image:'☕',isDrink:true},
+            {id:id++,name:'ลาเต้ ปั่น',price:60,cost:22,category:'coffee',image:'☕',isDrink:true},
+            {id:id++,name:'อเมริกาโน่ ส้ม',price:60,cost:22,category:'coffee',image:'🍊',isDrink:true},
+            {id:id++,name:'อเมริกาโน่มะพร้าว',price:60,cost:22,category:'coffee',image:'🥥',isDrink:true},
+            {id:id++,name:'ชาเขียว ร้อน',price:40,cost:14,category:'tea',image:'🍵',isDrink:true},
+            {id:id++,name:'ชาเขียว เย็น',price:50,cost:18,category:'tea',image:'🍵',isDrink:true},
+            {id:id++,name:'ชาเขียว ปั่น',price:60,cost:22,category:'tea',image:'🍵',isDrink:true},
+            {id:id++,name:'ชาไทย ร้อน',price:40,cost:14,category:'tea',image:'🍵',isDrink:true},
+            {id:id++,name:'ชาไทย เย็น',price:50,cost:18,category:'tea',image:'🍵',isDrink:true},
+            {id:id++,name:'ชาไทย ปั่น',price:60,cost:22,category:'tea',image:'🍵',isDrink:true},
+            {id:id++,name:'ช็อคโกแลต ร้อน',price:40,cost:15,category:'tea',image:'🍫',isDrink:true},
+            {id:id++,name:'ช็อคโกแลต เย็น',price:50,cost:18,category:'tea',image:'🍫',isDrink:true},
+            {id:id++,name:'ช็อคโกแลต ปั่น',price:60,cost:22,category:'tea',image:'🍫',isDrink:true},
+            {id:id++,name:'ชามะนาว',price:50,cost:18,category:'tea',image:'🍋',isDrink:true},
+            {id:id++,name:'ชาดำ',price:50,cost:16,category:'tea',image:'🍵',isDrink:true},
+            {id:id++,name:'นมสด ร้อน',price:40,cost:14,category:'tea',image:'🥛',isDrink:true},
+            {id:id++,name:'นมสด เย็น',price:50,cost:18,category:'tea',image:'🥛',isDrink:true},
+            {id:id++,name:'นมสด ปั่น',price:60,cost:22,category:'tea',image:'🥛',isDrink:true},
+            {id:id++,name:'ชาเขียวมัทฉะ ร้อน',price:30,cost:12,category:'tea',image:'🍵',isDrink:true},
+            {id:id++,name:'ชาเขียวมัทฉะ เย็น',price:45,cost:18,category:'tea',image:'🍵',isDrink:true},
+            {id:id++,name:'ชาเขียวมัทฉะ ปั่น',price:55,cost:22,category:'tea',image:'🍵',isDrink:true},
+            {id:id++,name:'ส้มสมูทตี้',price:50,cost:18,category:'softdrink',image:'🍊',isDrink:true},
+            {id:id++,name:'แตงโมสมูทตี้',price:50,cost:18,category:'softdrink',image:'🍉',isDrink:true},
+            {id:id++,name:'สตรอเบอรรี่สมูทตี้',price:50,cost:18,category:'softdrink',image:'🍓',isDrink:true},
+            {id:id++,name:'กีวีสมูทตี้',price:50,cost:18,category:'softdrink',image:'🥝',isDrink:true},
+            {id:id++,name:'แคนตาลูปสมูทตี้',price:50,cost:18,category:'softdrink',image:'🍈',isDrink:true},
+            {id:id++,name:'กล้วยสมูทตี้',price:50,cost:18,category:'softdrink',image:'🍌',isDrink:true},
+            {id:id++,name:'มิกซ์เบอรรี่สมูทตี้',price:50,cost:18,category:'softdrink',image:'🫐',isDrink:true},
+            {id:id++,name:'สตรอเบอรรี่โซดา',price:30,cost:10,category:'softdrink',image:'🍓',isDrink:true},
+            {id:id++,name:'กีวีโซดา',price:30,cost:10,category:'softdrink',image:'🥝',isDrink:true},
+            {id:id++,name:'ส้มโซดา',price:30,cost:10,category:'softdrink',image:'🍊',isDrink:true},
+            {id:id++,name:'เสาวรสโซดา',price:30,cost:10,category:'softdrink',image:'🟡',isDrink:true},
+            {id:id++,name:'บ๊วยโซดา',price:30,cost:10,category:'softdrink',image:'🟤',isDrink:true},
+            {id:id++,name:'บูลฮาวาย',price:30,cost:10,category:'softdrink',image:'🔵',isDrink:true},
+            {id:id++,name:'แดงโซดา',price:30,cost:10,category:'softdrink',image:'🔴',isDrink:true},
+            {id:id++,name:'เขียวโซดา',price:30,cost:10,category:'softdrink',image:'🟢',isDrink:true},
+            {id:id++,name:'แดงมะนาวโซดา',price:35,cost:12,category:'softdrink',image:'🔴',isDrink:true},
+            {id:id++,name:'เขียวมะนาวโซดา',price:35,cost:12,category:'softdrink',image:'🟢',isDrink:true},
+            {id:id++,name:'บูลเบอรรี่ชีสพาย',price:69,cost:28,category:'bakery',image:'🫐',isDrink:false},
+            {id:id++,name:'สตรอเบอรรี่ชีสพาย',price:69,cost:28,category:'bakery',image:'🍓',isDrink:false},
+            {id:id++,name:'เค้กส้ม',price:50,cost:20,category:'bakery',image:'🍊',isDrink:false},
+            {id:id++,name:'เค้กช็อคโกแลต',price:50,cost:20,category:'bakery',image:'🍫',isDrink:false},
+            {id:id++,name:'แซนวิชทุน่า',price:30,cost:12,category:'bakery',image:'🥪',isDrink:false},
+            {id:id++,name:'แซนวิชแฮมชีส',price:30,cost:12,category:'bakery',image:'🥪',isDrink:false},
+            {id:id++,name:'แซนวิชปูอัด',price:30,cost:12,category:'bakery',image:'🥪',isDrink:false},
+            {id:id++,name:'ทอฟฟี่เค้ก',price:50,cost:20,category:'bakery',image:'🍰',isDrink:false},
+            {id:id++,name:'ขนมปังปิ้ง',price:20,cost:6,category:'bakery',image:'🍞',isDrink:false},
+            {id:id++,name:'ขนมปังปิ้งเนย+น้ำตาล',price:20,cost:7,category:'bakery',image:'🍞',isDrink:false},
+            {id:id++,name:'ขนมปังปิ้งเนย+นม',price:20,cost:7,category:'bakery',image:'🍞',isDrink:false},
+            {id:id++,name:'ขนมปังปิ้งเนย+นม+ตาล',price:20,cost:8,category:'bakery',image:'🍞',isDrink:false},
+            {id:id++,name:'ขนมปังปิ้งเนย+ช็อค',price:20,cost:8,category:'bakery',image:'🍞',isDrink:false},
+            {id:id++,name:'ขนมปังปิ้งเนย+แยมสตรอ',price:20,cost:8,category:'bakery',image:'🍞',isDrink:false},
+            {id:id++,name:'ขนมปังปิ้งเนย+แยมส้ม',price:20,cost:8,category:'bakery',image:'🍞',isDrink:false},
+            {id:id++,name:'ขนมปังปิ้ง+กล้วย+ช็อค',price:30,cost:12,category:'bakery',image:'🍞',isDrink:false},
+            {id:id++,name:'คุกกี้ชิ้นใหญ่',price:25,cost:10,category:'bakery',image:'🍪',isDrink:false},
+            {id:id++,name:'เค้กเรดเวลเวท',price:69,cost:28,category:'bakery',image:'🍰',isDrink:false},
+            {id:id++,name:'คุกกี้กระป๋อง',price:95,cost:40,category:'bakery',image:'🍪',isDrink:false},
+            {id:id++,name:'เค้กกาแฟ',price:69,cost:28,category:'bakery',image:'🍰',isDrink:false},
+            {id:id++,name:'สตรอเบอรรี่ช็อตเค้ก',price:69,cost:28,category:'bakery',image:'🍰',isDrink:false},
+            {id:id++,name:'เพิ่มช็อต',price:10,cost:4,category:'other',image:'➕',isDrink:false,isAddon:true},
+            {id:id++,name:'เพิ่มท็อปปิ้ง',price:10,cost:4,category:'other',image:'🧁',isDrink:false,isAddon:true},
+            {id:id++,name:'น้ำดื่ม',price:7,cost:3,category:'other',image:'💧',isDrink:false},
+            {id:id++,name:'สตรอเบอรรี่โยเกิร์ต',price:60,cost:22,category:'other',image:'🍓',isDrink:true},
+            {id:id++,name:'มิกซ์เบอรรี่โยเกิร์ต',price:60,cost:22,category:'other',image:'🫐',isDrink:true},
+            {id:id++,name:'นมสดสตรอเบอรรี่โยเกิร์ต',price:65,cost:25,category:'other',image:'🥛',isDrink:true},
+            {id:id++,name:'ครัวซองแฮมชีส',price:50,cost:20,category:'other',image:'🥐',isDrink:false},
+            {id:id++,name:'แก้วมิชชั่น 30 oz+น้ำ',price:250,cost:90,category:'promotion',image:'🏆',isDrink:false},
+            {id:id++,name:'ขนมปังกระเทียม',price:35,cost:12,category:'promotion',image:'🧄',isDrink:false},
+            {id:id++,name:'วาฟเฟิล',price:30,cost:10,category:'promotion',image:'🧇',isDrink:false},
+            {id:id++,name:'คุกกี้คละรส เล็ก',price:49,cost:20,category:'promotion',image:'🍪',isDrink:false},
+            {id:id++,name:'โปรแก้ว 20 oz 150฿',price:150,cost:55,category:'promotion',image:'🥤',isDrink:false},
+            {id:id++,name:'น้ำส้มคั้น',price:50,cost:18,category:'promotion',image:'🍊',isDrink:true},
+            {id:id++,name:'เค้ก 1 แถม 1',price:69,cost:35,category:'promotion',image:'🎉',isDrink:false},
+            {id:id++,name:'แก้วมิชชั่น 20 oz+น้ำ',price:230,cost:80,category:'promotion',image:'🏆',isDrink:false},
+        ];
+        this.categories = [
+            {id:'coffee',name:'Coffee',icon:'☕'},{id:'tea',name:'Tea',icon:'🍵'},
+            {id:'softdrink',name:'Soft Drink',icon:'🥤'},{id:'bakery',name:'Bakery',icon:'🥐'},
+            {id:'other',name:'Other',icon:'📦'},{id:'promotion',name:'Promotion',icon:'🎉'}
+        ];
+        this.sweetnessLevels = [{value:0,label:'0%'},{value:25,label:'25%'},{value:50,label:'50%'},{value:75,label:'75%'},{value:100,label:'100%'}];
+        // Load product images from localStorage
+        this.productImages = JSON.parse(localStorage.getItem('pos_product_images')) || {};
+        this.loadOrders();
+    }
+
+    // ==================== IMAGE MANAGEMENT ====================
+    getProductImage(productId) { return this.productImages[productId] || null; }
+    setProductImage(productId, dataUrl) {
+        this.productImages[productId] = dataUrl;
+        try { localStorage.setItem('pos_product_images', JSON.stringify(this.productImages)); } catch(e) { alert('⚠️ หน่วยความจำเต็ม ไม่สามารถบันทึกรูปภาพได้'); }
+    }
+    removeProductImage(productId) {
+        delete this.productImages[productId];
+        localStorage.setItem('pos_product_images', JSON.stringify(this.productImages));
+    }
+
+    emojiImg(product, size=44) {
+        // product can be {id, image} or just a string (emoji/url)
+        const pid = typeof product === 'object' ? product.id : null;
+        const src = typeof product === 'object' ? product.image : product;
+        // Check custom image first
+        const custom = pid ? this.getProductImage(pid) : null;
+        if(custom) {
+            // base64 always works; URL only when online
+            if(custom.startsWith('data:') || navigator.onLine) {
+                return `<img src="${custom}" width="${size}" height="${size}" style="object-fit:cover;border-radius:8px;" onerror="this.style.display='none';this.nextSibling.style.display='inline-flex'"><span style="display:none;align-items:center;justify-content:center;width:${size}px;height:${size}px;font-size:${Math.round(size*.6)}px">${src}</span>`;
+            }
+        }
+        // URL emoji
+        if(typeof src==='string'&&(src.startsWith('http')||src.startsWith('data:'))) {
+            if(!navigator.onLine) {
+                // offline: show emoji fallback
+                const p = this.products.find(p=>p.id===pid);
+                return `<span style="display:inline-flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;font-size:${Math.round(size*.6)}px">${p?.image||'🍽️'}</span>`;
+            }
+            return `<img src="${src}" width="${size}" height="${size}" style="object-fit:cover;border-radius:8px;">`;
+        }
+        return `<span style="display:inline-flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;font-size:${Math.round(size*.6)}px">${src}</span>`;
+    }
+
+    getISOWeek(d) { const date=new Date(d);date.setHours(0,0,0,0);date.setDate(date.getDate()+3-(date.getDay()+6)%7);const w1=new Date(date.getFullYear(),0,4);const n=1+Math.round(((date-w1)/86400000-3+(w1.getDay()+6)%7)/7);return`${date.getFullYear()}-W${String(n).padStart(2,'0')}`; }
+    getWeekRange(s){const[y,w]=s.split('-W').map(Number);const j=new Date(y,0,4);const st=new Date(j);st.setDate(j.getDate()-(j.getDay()||7)+1+(w-1)*7);const e=new Date(st);e.setDate(st.getDate()+6);return{start:st,end:e};}
+    getWeekLabel(s){const{start:s2,end:e}=this.getWeekRange(s);return`${s2.toLocaleDateString('th-TH',{day:'numeric',month:'short'})} - ${e.toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'numeric'})}`;}
+
+    // ==================== DATA STORAGE ====================
+    loadOrders() {
+        this._dbReady=false;
+        const req=indexedDB.open('POSCafeDB',1);
+        req.onupgradeneeded=(e)=>{const db=e.target.result;if(!db.objectStoreNames.contains('orders'))db.createObjectStore('orders',{keyPath:'id'});};
+        req.onsuccess=(e)=>{this._db=e.target.result;this._dbReady=true;
+            const tx=this._db.transaction('orders','readonly');const s=tx.objectStore('orders');const g=s.getAll();
+            g.onsuccess=()=>{if(g.result&&g.result.length>0){this.state.orders=g.result.sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));this.render();}
+                else{try{const old=localStorage.getItem('pos_orders');if(old){const p=JSON.parse(old);if(p.length>0){this.state.orders=p;this._saveBatch(p);localStorage.removeItem('pos_orders');}}}catch(e){}this.render();}};
+        };
+        req.onerror=()=>{try{const s=localStorage.getItem('pos_orders');this.state.orders=s?JSON.parse(s):[];}catch(e){this.state.orders=[];}this.render();};
+    }
+    _slimOrder(o) { return {id:o.id,timestamp:o.timestamp,items:o.items.map(i=>{const s={name:i.name,price:i.price,cost:i.cost,quantity:i.quantity,category:i.category};if(i.originalName)s.originalName=i.originalName;if(i.sweetness!==undefined)s.sweetness=i.sweetness;if(i.extraShots)s.extraShots=i.extraShots;if(i.isDrink)s.isDrink=true;return s;}),subtotal:o.subtotal,totalCost:o.totalCost,discount:o.discount,vat:o.vat,total:o.total,profit:o.profit,staffId:o.staffId,staffName:o.staffName}; }
+    saveOrders() {
+        if(this._dbReady&&this._db){try{const tx=this._db.transaction('orders','readwrite');tx.objectStore('orders').put(this._slimOrder(this.state.orders[0]));}catch(e){}}
+        else{try{localStorage.setItem('pos_orders',JSON.stringify(this.state.orders.map(o=>this._slimOrder(o))));}catch(e){alert('⚠️ พื้นที่เก็บข้อมูลเต็ม กรุณา Export ก่อน');}}
+    }
+    _saveBatch(orders){if(!this._dbReady||!this._db)return;const slim=orders.map(o=>this._slimOrder(o));let idx=0;const save=()=>{if(idx>=slim.length)return;const tx=this._db.transaction('orders','readwrite');const st=tx.objectStore('orders');const end=Math.min(idx+500,slim.length);for(let i=idx;i<end;i++)st.put(slim[i]);idx=end;tx.oncomplete=save;};save();}
+    _clearIDB(){if(this._dbReady&&this._db){const tx=this._db.transaction('orders','readwrite');tx.objectStore('orders').clear();}try{localStorage.removeItem('pos_orders');}catch(e){}}
+
+    // ==================== SUPABASE ====================
+    async syncToSupabase(order) {
+        const url = this.state.supabaseUrl, key = this.state.supabaseKey;
+        if(!url||!key||!navigator.onLine) return;
+        try {
+            await fetch(`${url}/rest/v1/orders`, {
+                method:'POST', headers:{'Content-Type':'application/json','apikey':key,'Authorization':`Bearer ${key}`,'Prefer':'return=minimal'},
+                body: JSON.stringify({id:order.id,timestamp:order.timestamp,items:order.items,subtotal:order.subtotal,total_cost:order.totalCost,discount:order.discount,vat:order.vat,total:order.total,profit:order.profit,staff_id:order.staffId||'',staff_name:order.staffName||''})
+            });
+        } catch(e) { console.log('Supabase sync error:', e); }
+    }
+
+    // ==================== CART ACTIONS ====================
+    addToCart(product) {
+        if(product.isDrink){this.state.showSweetness=true;this.state.sweetnessProduct=product;this.render();return;}
+        const ex=this.state.cart.find(i=>i.id===product.id&&!i.sweetness&&i.sweetness!==0);
+        if(ex)ex.quantity++;else this.state.cart.push({...product,quantity:1});
+        this.render();
+    }
+    addToCartWithSweetness(product,sweetness){
+        const dn=`${product.name} (${sweetness}%)`;
+        const ex=this.state.cart.find(i=>i.id===product.id&&i.sweetness===sweetness);
+        if(ex)ex.quantity++;else this.state.cart.push({...product,name:dn,originalName:product.name,sweetness,quantity:1});
+        this.state.showSweetness=false;this.state.sweetnessProduct=null;this.render();
+    }
+    addShotToCartItem(i){const item=this.state.cart[i];if(!item.extraShots)item.extraShots=0;item.extraShots++;item.price+=10;this.render();}
+    updateQuantity(i,c){this.state.cart[i].quantity+=c;if(this.state.cart[i].quantity<=0)this.state.cart.splice(i,1);this.render();}
+    removeFromCart(i){this.state.cart.splice(i,1);this.render();}
+    clearCart(){this.state.cart=[];this.render();}
+    closeReceipt(){this.state.showReceipt=false;this.state.lastOrder=null;this.render();}
+
+    checkout() {
+        if(!this.state.cart.length) return;
+        const sub=this.state.cart.reduce((s,i)=>s+i.price*i.quantity,0);
+        const tc=this.state.cart.reduce((s,i)=>s+i.cost*i.quantity,0);
+        const disc=(sub*this.state.discount)/100;
+        const vat=(sub-disc)*0.07; const tot=sub-disc+vat; const prof=tot-tc;
+        const order={id:Date.now(),timestamp:new Date().toISOString(),items:[...this.state.cart],subtotal:sub,totalCost:tc,discount:disc,vat,total:tot,profit:prof,staffId:this.auth.currentUser?.id,staffName:this.auth.currentUser?.name||''};
+        this.state.orders.unshift(order);
+        this.saveOrders();
+        // Supabase sync
+        this.syncToSupabase(order);
+        // Auto Google Sheets
+        if(this.state.autoExportSheets&&this.state.googleSheetUrl) this.sendOrderToSheets(order);
+        // Show receipt
+        this.state.lastOrder=order;
+        this.state.showReceipt=true;
+        this.state.cart=[];
+        this.render();
+    }
+    async sendOrderToSheets(order){if(!this.state.googleSheetUrl)return;try{const d=new Date(order.timestamp);const rows=order.items.map(item=>({date:d.toLocaleDateString('th-TH'),time:d.toLocaleTimeString('th-TH'),category:this.getCategoryName(item.category),item:item.name,quantity:item.quantity,price:item.price,cost:item.cost,subtotal:order.subtotal.toFixed(2),discount:order.discount.toFixed(2),vat:order.vat.toFixed(2),total:order.total.toFixed(2),profit:order.profit.toFixed(2),staff:order.staffName||''}));await fetch(this.state.googleSheetUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:rows,month:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`})});}catch(e){}}
+
+    getCategoryName(c){return{coffee:'Coffee',tea:'Tea',softdrink:'Soft Drink',bakery:'Bakery',other:'Other',promotion:'Promotion'}[c]||c;}
+    getFilteredProducts(){return this.products.filter(p=>p.category===this.state.selectedCategory);}
+    getAvailableMonths(){const m=new Set();this.state.orders.forEach(o=>{const d=new Date(o.timestamp);m.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);});return Array.from(m).sort().reverse();}
+    getMonthName(mk){if(mk==='all')return'ทั้งหมด';const[y,m]=mk.split('-');const n=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];return`${n[parseInt(m)-1]} ${parseInt(y)+543}`;}
+    getMonthNameFull(mk){if(mk==='all')return'ทั้งหมด';const[y,m]=mk.split('-');const n=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];return`${n[parseInt(m)-1]} ${parseInt(y)+543}`;}
+    getFilteredOrders(){if(this.state.selectedMonth==='all')return this.state.orders;return this.state.orders.filter(o=>{const d=new Date(o.timestamp);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`===this.state.selectedMonth;});}
+
+    getExportOrders(){const p=this.state.exportPeriod;return this.state.orders.filter(o=>{const d=new Date(o.timestamp);if(p==='day')return d.toISOString().split('T')[0]===this.state.exportDate;if(p==='week'){const{start,end}=this.getWeekRange(this.state.exportWeek);start.setHours(0,0,0,0);end.setHours(23,59,59,999);return d>=start&&d<=end;}if(p==='month')return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`===this.state.exportMonth;if(p==='year')return String(d.getFullYear())===this.state.exportYear;return true;});}
+    getExportLabel(){const p=this.state.exportPeriod;if(p==='day'){const d=new Date(this.state.exportDate+'T00:00:00');return`วันที่ ${d.toLocaleDateString('th-TH',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}`;}if(p==='week')return`สัปดาห์ ${this.getWeekLabel(this.state.exportWeek)}`;if(p==='month')return this.getMonthNameFull(this.state.exportMonth);if(p==='year')return`ปี ${parseInt(this.state.exportYear)+543}`;return'';}
+    calcExportStats(orders){const revenue=orders.reduce((s,o)=>s+o.total,0),cost=orders.reduce((s,o)=>s+o.totalCost,0),profit=orders.reduce((s,o)=>s+o.profit,0),items=orders.reduce((s,o)=>s+o.items.reduce((ss,i)=>ss+i.quantity,0),0),margin=revenue>0?(profit/revenue*100):0;const productMap={},catMap={};orders.forEach(o=>o.items.forEach(item=>{const k=item.originalName||item.name;if(!productMap[k])productMap[k]={name:k,category:item.category,qty:0,revenue:0,profit:0};productMap[k].qty+=item.quantity;productMap[k].revenue+=item.price*item.quantity;productMap[k].profit+=(item.price-item.cost)*item.quantity;if(!catMap[item.category])catMap[item.category]={qty:0,revenue:0,profit:0};catMap[item.category].qty+=item.quantity;catMap[item.category].revenue+=item.price*item.quantity;catMap[item.category].profit+=(item.price-item.cost)*item.quantity;}));const topProducts=Object.values(productMap).sort((a,b)=>b.qty-a.qty).slice(0,10);return{revenue,cost,profit,items,margin,orderCount:orders.length,topProducts,catMap};}
+    exportPeriodCSV(){const orders=this.getExportOrders();if(!orders.length){alert('❌ ไม่มีข้อมูลในช่วงที่เลือก');return;}const label=this.getExportLabel();const headers=['วันที่','เวลา','หมวดหมู่','รายการ','จำนวน','ราคา','ต้นทุน','ยอดรวม','ส่วนลด','VAT','สุทธิ','กำไร','พนักงาน'];const rows=orders.flatMap(o=>{const d=new Date(o.timestamp);return o.items.map(item=>[d.toLocaleDateString('th-TH'),d.toLocaleTimeString('th-TH'),this.getCategoryName(item.category),item.name,item.quantity,item.price,item.cost,o.subtotal.toFixed(2),o.discount.toFixed(2),o.vat.toFixed(2),o.total.toFixed(2),o.profit.toFixed(2),o.staffName||'']);});const csv=[headers.join(','),...rows.map(r=>r.join(','))].join('\n');const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8;'});const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download=`POS_${this.state.exportPeriod}_${this.state.exportDate||this.state.exportWeek||this.state.exportMonth||this.state.exportYear}.csv`;link.click();alert(`✅ Export CSV สำเร็จ!\n${label}\n${orders.length} รายการ`);}
+    async exportPeriodSheets(){const orders=this.getExportOrders();if(!orders.length){alert('❌ ไม่มีข้อมูลในช่วงที่เลือก');return;}if(!this.state.googleSheetUrl){this.state.showSettings=true;this.render();return;}try{const data=orders.flatMap(o=>{const d=new Date(o.timestamp);return o.items.map(item=>({date:d.toLocaleDateString('th-TH'),time:d.toLocaleTimeString('th-TH'),category:this.getCategoryName(item.category),item:item.name,quantity:item.quantity,price:item.price,cost:item.cost,subtotal:o.subtotal.toFixed(2),discount:o.discount.toFixed(2),vat:o.vat.toFixed(2),total:o.total.toFixed(2),profit:o.profit.toFixed(2),staff:o.staffName||''}));});const mk=this.state.exportPeriod==='year'?this.state.exportYear:this.state.exportPeriod==='month'?this.state.exportMonth:this.state.exportPeriod==='week'?this.state.exportWeek:this.state.exportDate;await fetch(this.state.googleSheetUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify({data,month:mk})});alert(`✅ ส่งไป Google Drive สำเร็จ!\n📋 Tab: ${mk}`);}catch(e){alert('❌ '+e.message);}}
+    getProductAnalytics(){const fo=this.getFilteredOrders();const m={};fo.forEach(o=>o.items.forEach(item=>{const k=item.originalName||item.name;if(!m[k])m[k]={name:k,category:item.category,quantity:0,revenue:0,cost:0,profit:0,basePrice:item.price,baseCost:item.cost,orders:new Set()};m[k].quantity+=item.quantity;m[k].revenue+=item.price*item.quantity;m[k].cost+=item.cost*item.quantity;m[k].profit+=(item.price-item.cost)*item.quantity;m[k].orders.add(o.id);}));return Object.values(m).map(p=>({...p,profitPerUnit:p.quantity>0?p.profit/p.quantity:0,profitMargin:p.revenue>0?(p.profit/p.revenue)*100:0,orderCount:p.orders.size}));}
+    classifyProduct(p,mxQ,mxP){const qr=mxQ>0?p.quantity/mxQ:0,pr=mxP>0?p.profitPerUnit/mxP:0;if(qr>=.3&&pr>=.3)return{label:'⭐ Star',cls:'signal-star'};if(qr>=.3)return{label:'🔄 Volume',cls:'signal-keep'};if(pr>=.3)return{label:'💎 Niche',cls:'signal-warn'};return{label:'⚠️ Review',cls:'signal-drop'};}
+    getBundleSuggestions(){const a=this.getProductAnalytics();if(!a.length)return[];const mxQ=Math.max(...a.map(x=>x.quantity));const stars=a.filter(p=>p.quantity/mxQ>=.3).sort((a,b)=>b.quantity-a.quantity).slice(0,5);const slow=a.filter(p=>p.quantity/mxQ<.3&&p.profitPerUnit>0).sort((a,b)=>b.profitPerUnit-a.profitPerUnit).slice(0,5);const bundles=[];stars.forEach(s=>slow.forEach(sl=>{if(s.category!==sl.category){const bp=Math.round((s.basePrice+sl.basePrice)*.9);bundles.push({star:s.name,slow:sl.name,originalTotal:s.basePrice+sl.basePrice,bundlePrice:bp,bundleCost:s.baseCost+sl.baseCost,bundleProfit:bp-(s.baseCost+sl.baseCost),discount:s.basePrice+sl.basePrice-bp,profitMargin:bp>0?((bp-(s.baseCost+sl.baseCost))/bp*100):0});}}));return bundles.sort((a,b)=>b.bundleProfit-a.bundleProfit).slice(0,8);}
+    getStockInsights(){const fo=this.getFilteredOrders();if(!fo.length)return{daily:[],daysCount:0,peakHours:[]};const dm={},hm={};fo.forEach(o=>{const d=new Date(o.timestamp);const dk=d.toLocaleDateString('th-TH');const h=d.getHours();if(!hm[h])hm[h]=0;hm[h]++;o.items.forEach(item=>{const k=item.originalName||item.name;if(!dm[k])dm[k]={name:k,category:item.category,totalQty:0,days:new Set()};dm[k].totalQty+=item.quantity;dm[k].days.add(dk);});});return{daily:Object.values(dm).map(d=>({...d,daysActive:d.days.size,avgPerDay:d.days.size>0?d.totalQty/d.days.size:0,suggestedStock:d.days.size>0?Math.ceil(d.totalQty/d.days.size*1.3):0})).sort((a,b)=>b.avgPerDay-a.avgPerDay),daysCount:new Set(fo.map(o=>new Date(o.timestamp).toLocaleDateString('th-TH'))).size,peakHours:Object.entries(hm).map(([h,c])=>({hour:parseInt(h),count:c})).sort((a,b)=>b.count-a.count)};}
+    calculateStats(){const fo=this.getFilteredOrders();const ts=fo.reduce((s,o)=>s+o.total,0),tc=fo.reduce((s,o)=>s+o.totalCost,0),tp=fo.reduce((s,o)=>s+o.profit,0),pm=ts>0?(tp/ts)*100:0;const cs={};this.categories.forEach(c=>{cs[c.id]={name:c.name,quantity:0,revenue:0,cost:0,profit:0,icon:c.icon};});fo.forEach(o=>o.items.forEach(i=>{if(cs[i.category]){cs[i.category].quantity+=i.quantity;cs[i.category].revenue+=i.price*i.quantity;cs[i.category].cost+=i.cost*i.quantity;cs[i.category].profit+=(i.price-i.cost)*i.quantity;}}));return{totalSales:ts,totalCost:tc,totalProfit:tp,profitMargin:pm,totalOrders:fo.length,topProducts:this.getProductAnalytics().sort((a,b)=>b.quantity-a.quantity),categorySales:cs};}
+    getMonthlyTrend(){const mm={};this.state.orders.forEach(o=>{const d=new Date(o.timestamp);const mk=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;if(!mm[mk])mm[mk]={revenue:0,cost:0,profit:0,orders:0,items:0};mm[mk].revenue+=o.total;mm[mk].cost+=o.totalCost;mm[mk].profit+=o.profit;mm[mk].orders++;mm[mk].items+=o.items.reduce((s,i)=>s+i.quantity,0);});return Object.entries(mm).sort((a,b)=>a[0].localeCompare(b[0])).map(([k,v])=>({month:k,monthName:this.getMonthNameFull(k),...v}));}
+
+    // ==================== RENDER MAIN ====================
+    render() {
+        const app=document.getElementById('app');
+        // Show login if not authenticated
+        if(!this.auth.isLoggedIn()){app.innerHTML=this.renderLoginScreen();this.bindLoginEvents();return;}
+
+        const sub=this.state.cart.reduce((s,i)=>s+i.price*i.quantity,0);
+        const tc=this.state.cart.reduce((s,i)=>s+i.cost*i.quantity,0);
+        const disc=(sub*this.state.discount)/100;
+        const vat=(sub-disc)*.07; const tot=sub-disc+vat;
+
+        let content='';
+        if(this.state.currentView==='pos') content=`<div class="flex h-screen">${this.renderSidebar()}<div class="flex-1 flex overflow-hidden">${this.renderProducts()}${this.renderCart(sub,tc,disc,vat,tot)}</div></div>`;
+        else content=`<div class="flex h-screen">${this.renderSidebar()}${this.renderReports()}</div>`;
+
+        if(this.state.showSweetness) content+=this.renderSweetnessModal();
+        if(this.state.showSettings) content+=this.renderSettingsModal();
+        if(this.state.showDemoGenerator) content+=this.renderDemoModal();
+        if(this.state.showReceipt&&this.state.lastOrder) content+=this.renderReceiptModal(this.state.lastOrder);
+        if(this.state.showUserMgmt) content+=this.renderUserMgmtModal();
+        if(this.state.showImageMgmt&&this.state.imageProduct) content+=this.renderImageMgmtModal();
+
+        app.innerHTML=content;
+        this.bindEvents();
+        requestAnimationFrame(()=>this.initDashboardCharts());
+    }
+
+    // ==================== LOGIN SCREEN ====================
+    renderLoginScreen() {
+        return `<div class="login-bg">
+            <div class="login-card">
+                <div class="text-center mb-8">
+                    <div class="w-20 h-20 mx-auto mb-4 rounded-2xl overflow-hidden shadow-lg" style="background:linear-gradient(135deg,#C9A96E,#8d6d38)">
+                        <div class="w-full h-full flex items-center justify-center text-4xl">☕</div>
+                    </div>
+                    <h1 class="text-2xl font-bold text-gray-800">POS Café Pro</h1>
+                    <p class="text-gray-500 text-sm mt-1">ระบบจัดการร้านกาแฟ</p>
+                </div>
+
+                ${this.state.loginError?`<div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm text-center">❌ ${this.state.loginError}</div>`:''}
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">👤 ชื่อผู้ใช้</label>
+                        <input id="login-username" type="text" placeholder="กรอกชื่อผู้ใช้" class="login-input" autocomplete="username">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">🔒 รหัสผ่าน</label>
+                        <input id="login-password" type="password" placeholder="กรอกรหัสผ่าน" class="login-input" autocomplete="current-password">
+                    </div>
+                    <button id="login-btn" class="login-btn mt-2">เข้าสู่ระบบ →</button>
+                </div>
+
+                <div class="login-hint mt-5">
+                    <div class="text-xs font-bold text-gray-500 mb-2">🔑 บัญชีเริ่มต้น (เปลี่ยนได้ในระบบ):</div>
+                    <div class="space-y-1.5">
+                        <div class="flex items-center gap-2 text-xs"><span class="role-badge role-owner">เจ้าของ</span><code class="bg-gray-100 px-1.5 py-0.5 rounded">owner</code><span class="text-gray-400">/</span><code class="bg-gray-100 px-1.5 py-0.5 rounded">owner1234</code></div>
+                        <div class="flex items-center gap-2 text-xs"><span class="role-badge role-manager">ผู้จัดการ</span><code class="bg-gray-100 px-1.5 py-0.5 rounded">manager</code><span class="text-gray-400">/</span><code class="bg-gray-100 px-1.5 py-0.5 rounded">mgr1234</code></div>
+                        <div class="flex items-center gap-2 text-xs"><span class="role-badge role-staff">พนักงาน</span><code class="bg-gray-100 px-1.5 py-0.5 rounded">staff</code><span class="text-gray-400">/</span><code class="bg-gray-100 px-1.5 py-0.5 rounded">staff1234</code></div>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    // ==================== SIDEBAR ====================
+    renderSidebar() {
+        const v=this.state.currentView;
+        const u=this.auth.currentUser;
+        const roleClass={owner:'role-owner',manager:'role-manager',staff:'role-staff'}[u?.role]||'';
+        const roleName={owner:'เจ้าของ',manager:'ผู้จัดการ',staff:'พนักงาน'}[u?.role]||'';
+        return `<div class="flex flex-col h-screen" style="width:220px;background:linear-gradient(180deg,#0f0f20 0%,#1a1a2e 60%,#16213e 100%);color:white;flex-shrink:0">
+            
+            <div class="p-5 pb-4">
+                <div class="flex items-center gap-3 mb-5">
+                    <div class="w-10 h-10 rounded-xl flex items-center justify-center text-2xl" style="background:linear-gradient(135deg,#C9A96E,#8d6d38)">☕</div>
+                    <div><div class="font-bold text-sm" style="color:#C9A96E">POS Café Pro</div><div class="text-xs" style="color:#888">ระบบขายหน้าร้าน</div></div>
+                </div>
+                
+                <div class="p-3 rounded-xl" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08)">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-lg flex items-center justify-center text-lg" style="background:rgba(201,169,110,.2)">👤</div>
+                        <div class="flex-1 min-w-0"><div class="text-sm font-medium truncate">${u?.name||''}</div><span class="text-xs px-2 py-0.5 rounded-full ${roleClass}">${roleName}</span></div>
+                    </div>
+                </div>
+            </div>
+            
+            <nav class="flex-1 px-3 space-y-1 overflow-y-auto">
+                <div data-view="pos" class="nav-item ${v==='pos'?'active':''}"><span class="nav-icon">🛒</span>ขายหน้าร้าน</div>
+                ${this.auth.can('reports')?`<div data-view="reports" class="nav-item ${v==='reports'?'active':''}"><span class="nav-icon">📊</span>รายงาน & วิเคราะห์</div>`:''}
+                <div class="mt-4 mb-1 px-2 text-xs" style="color:rgba(255,255,255,.3);font-weight:600;letter-spacing:.05em">TOOLS</div>
+                ${this.auth.can('settings')?`<div class="settings-btn nav-item"><span class="nav-icon">📊</span>Google Drive ${this.state.autoExportSheets&&this.state.googleSheetUrl?'<span style="color:#C9A96E;margin-left:auto">●</span>':''}</div>`:''}
+                ${this.auth.can('supabase')?`<div class="supabase-btn nav-item"><span class="nav-icon">☁️</span>Supabase Cloud ${this.state.supabaseUrl?'<span style="color:#10b981;margin-left:auto">●</span>':''}</div>`:''}
+                ${this.auth.can('manage_users')?`<div class="user-mgmt-btn nav-item"><span class="nav-icon">👥</span>จัดการผู้ใช้</div>`:''}
+                ${this.auth.can('demo')?`<div class="demo-btn nav-item"><span class="nav-icon">🧪</span>สร้างข้อมูลจำลอง</div>`:''}
+                ${this.auth.can('clear')?`<div class="clear-all-btn nav-item" style="color:rgba(255,100,100,.7)"><span class="nav-icon">🗑️</span>ล้างข้อมูลทั้งหมด</div>`:''}
+            </nav>
+            
+            <div class="p-3 pt-0">
+                <button class="logout-btn w-full py-2.5 rounded-xl text-sm font-medium transition" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:#aaa">↩️ ออกจากระบบ</button>
+            </div>
+        </div>`;
+    }
+
+    // ==================== PRODUCTS ====================
+    renderProducts() {
+        const prods=this.getFilteredProducts();
+        const isAdmin=this.auth.can('manage_products');
+        return `<div class="flex-1 flex flex-col overflow-hidden" style="background:#f5f3ef">
+            
+            <div class="p-3 pb-0">
+                <div class="flex gap-2 bg-white p-2.5 rounded-xl shadow-sm border border-gray-100 flex-wrap">
+                    ${this.categories.map(c=>`<button data-category="${c.id}" class="category-btn px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-sm font-medium transition ${this.state.selectedCategory===c.id?'text-white shadow-md':'bg-gray-50 hover:bg-gold-50 text-gray-600'}" style="${this.state.selectedCategory===c.id?'background:linear-gradient(135deg,#C9A96E,#b08a4a)':''}"><span>${c.icon}</span><span>${c.name}</span></button>`).join('')}
+                </div>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto p-3">
+                <div class="grid gap-2" style="grid-template-columns:repeat(auto-fill,minmax(110px,1fr))">
+                    ${prods.map(p=>{
+                        const customImg=this.getProductImage(p.id);
+                        const imgDisplay=customImg?`<img src="${customImg}" style="width:44px;height:44px;object-fit:cover;border-radius:8px" onerror="this.style.display='none'">`:`<span style="font-size:26px">${p.image}</span>`;
+                        return `<div data-product-id="${p.id}" class="product-card bg-white rounded-xl p-2.5 cursor-pointer relative group" style="min-height:90px">
+                            <div class="flex items-center justify-center mb-1" style="height:44px">${imgDisplay}</div>
+                            <div class="text-xs font-medium text-center leading-tight text-gray-700 mb-0.5">${p.name}</div>
+                            <div class="text-sm font-bold text-center" style="color:#C9A96E">฿${p.price}</div>
+                            ${isAdmin?`<button data-img-product="${p.id}" class="img-upload-btn absolute top-1 right-1 w-6 h-6 bg-white rounded-full shadow text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition border border-gray-200">📷</button>`:''}
+                        </div>`;
+                    }).join('')}
+                </div>
+            </div>
+        </div>`;
+    }
+
+    // ==================== CART ====================
+    renderCart(sub,tc,disc,vat,tot) {
+        const hasItems = this.state.cart.length > 0;
+        const clearBtn = hasItems ? '<button class="clear-cart text-gray-400 hover:text-red-500 text-xl transition">&#x2715;</button>' : '';
+        const staffBadge = this.auth.currentUser ? '<div class="text-xs text-gray-400 mt-1">&#x1F464; ' + this.auth.currentUser.name + '</div>' : '';
+        let itemsHtml = '';
+        if (!hasItems) {
+            itemsHtml = '<div class="text-center text-gray-400 mt-16"><div class="text-5xl mb-3">&#x1F6D2;</div><p class="text-sm">ยังไม่มีรายการ</p><p class="text-xs mt-1 text-gray-300">แตะสินค้าเพื่อเพิ่ม</p></div>';
+        } else {
+            itemsHtml = '<div class="space-y-2">' + this.state.cart.map((item,i) => {
+                const shotBtn = item.isDrink ? '<button data-addshot="'+i+'" class="add-shot-btn ml-1">+ช็อต</button>' : '';
+                const shotInfo = item.extraShots ? ' (+ช็อต &#x0e3f;'+(item.extraShots*10)+')' : '';
+                return '<div class="bg-gray-50 p-3 rounded-xl">'
+                    +'<div class="flex items-start justify-between mb-2">'
+                    +'<div class="flex-1 pr-2"><div class="font-medium text-sm leading-tight">'+item.name+'</div>'
+                    +'<div class="text-xs text-gray-500 mt-0.5">&#x0e3f;'+item.price+shotInfo+'</div></div>'
+                    +'<button data-remove="'+i+'" class="remove-item text-red-400 hover:text-red-600 text-sm">&#x2715;</button></div>'
+                    +'<div class="flex items-center justify-between">'
+                    +'<div class="flex items-center gap-1">'
+                    +'<button data-dec="'+i+'" class="qty-btn w-7 h-7 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm font-bold">&#x2212;</button>'
+                    +'<span class="w-7 text-center font-bold text-sm">'+item.quantity+'</span>'
+                    +'<button data-inc="'+i+'" class="qty-btn w-7 h-7 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm font-bold">+</button>'
+                    +shotBtn+'</div>'
+                    +'<div class="font-bold text-sm" style="color:#107c10">&#x0e3f;'+(item.price*item.quantity).toFixed(0)+'</div>'
+                    +'</div></div>';
+            }).join('') + '</div>';
+        }
+        let bottomHtml = '';
+        if (hasItems) {
+            bottomHtml = '<div class="p-4 border-t border-gray-100">'
+                +'<div class="space-y-1.5 text-sm mb-3">'
+                +'<div class="flex justify-between text-gray-600"><span>ยอดรวม</span><span>&#x0e3f;'+sub.toFixed(2)+'</span></div>'
+                +'<div class="flex justify-between text-red-500"><span>ส่วนลด ('+this.state.discount+'%)</span><span>-&#x0e3f;'+disc.toFixed(2)+'</span></div>'
+                +'<div class="flex justify-between text-gray-600"><span>VAT (7%)</span><span>&#x0e3f;'+vat.toFixed(2)+'</span></div>'
+                +'<div class="flex justify-between text-lg font-bold pt-2 border-t border-gray-100 mt-2"><span>รวมสุทธิ</span><span style="color:#107c10">&#x0e3f;'+tot.toFixed(2)+'</span></div>'
+                +'</div>'
+                +'<button class="checkout-btn w-full py-3.5 text-white rounded-xl font-bold text-lg shadow-md transition" style="background:linear-gradient(135deg,#C9A96E,#b08a4a)">ชำระเงิน &#x0e3f;'+tot.toFixed(2)+'</button>'
+                +'</div>';
+        } else {
+            bottomHtml = '<div class="p-4 border-t border-gray-100"><button class="checkout-btn w-full py-3.5 rounded-xl font-bold text-lg bg-gray-100 text-gray-400 cursor-not-allowed">ชำระเงิน</button></div>';
+        }
+        return '<div class="flex flex-col border-l border-gray-100 bg-white" style="width:360px;flex-shrink:0">'
+            +'<div class="p-4 border-b border-gray-100"><div class="flex items-center justify-between">'
+            +'<h2 class="text-lg font-bold text-gray-800">&#x1F6D2; รายการสั่งซื้อ</h2>'+clearBtn+'</div>'+staffBadge+'</div>'
+            +'<div class="flex-1 overflow-y-auto p-3">'+itemsHtml+'</div>'
+            +bottomHtml+'</div>';
+    }
+
+    // ==================== RECEIPT MODAL ====================
+    renderReceiptModal(order) {
+        const d=new Date(order.timestamp);
+        const shopName='POS Café Pro';
+        return `<div class="fixed inset-0 flex items-center justify-center z-50" id="receipt-overlay" style="background:rgba(0,0,0,.6)">
+            <div class="receipt-card" id="receipt-content">
+                
+                <div class="text-center p-6 pb-4" style="background:linear-gradient(135deg,#1a1a2e,#2d3250);color:white;border-radius:16px 16px 0 0">
+                    <div class="text-3xl mb-2">☕</div>
+                    <div class="text-xl font-bold">${shopName}</div>
+                    <div class="text-xs mt-1" style="color:rgba(255,255,255,.6)">ขอบคุณที่ใช้บริการ</div>
+                </div>
+                
+                <div class="px-5 py-3 bg-gray-50 border-b border-gray-100">
+                    <div class="flex justify-between text-xs text-gray-500">
+                        <span>📅 ${d.toLocaleDateString('th-TH',{weekday:'short',year:'numeric',month:'short',day:'numeric'})}</span>
+                        <span>⏰ ${d.toLocaleTimeString('th-TH')}</span>
+                    </div>
+                    <div class="flex justify-between text-xs text-gray-500 mt-1">
+                        <span>🧾 #${String(order.id).slice(-8)}</span>
+                        <span>👤 ${order.staffName||'—'}</span>
+                    </div>
+                </div>
+                
+                <div class="px-5 py-4">
+                    <div class="text-xs font-bold text-gray-400 uppercase mb-2">รายการ</div>
+                    <div class="space-y-2">
+                        ${order.items.map(i=>`<div class="flex justify-between items-start">
+                            <div class="flex-1 pr-2"><div class="text-sm font-medium">${i.name}</div><div class="text-xs text-gray-400">฿${i.price} × ${i.quantity}</div></div>
+                            <div class="text-sm font-bold">฿${(i.price*i.quantity).toFixed(0)}</div>
+                        </div>`).join('')}
+                    </div>
+                    <hr class="receipt-divider">
+                    <div class="space-y-1.5 text-sm">
+                        <div class="flex justify-between text-gray-500"><span>ยอดรวม</span><span>฿${order.subtotal.toFixed(2)}</span></div>
+                        <div class="flex justify-between text-red-500"><span>ส่วนลด</span><span>-฿${order.discount.toFixed(2)}</span></div>
+                        <div class="flex justify-between text-gray-500"><span>VAT 7%</span><span>฿${order.vat.toFixed(2)}</span></div>
+                        <div class="flex justify-between text-lg font-bold pt-2 border-t-2 border-gray-800"><span>รวมสุทธิ</span><span style="color:#107c10">฿${order.total.toFixed(2)}</span></div>
+                    </div>
+                    <div class="text-center mt-4 pt-3 border-t border-dashed border-gray-200">
+                        <div class="text-xs text-gray-400">🙏 ขอบคุณที่มาอุดหนุน</div>
+                        <div class="text-xs text-gray-300 mt-1">กรุณามาอีก!</div>
+                    </div>
+                </div>
+                
+                <div class="p-4 pt-0 flex gap-2 no-print">
+                    <button onclick="window.print()" class="flex-1 py-3 text-white font-bold rounded-xl text-sm" style="background:linear-gradient(135deg,#C9A96E,#b08a4a)">🖨️ พิมพ์ใบเสร็จ</button>
+                    <button class="close-receipt-btn flex-1 py-3 font-bold rounded-xl text-sm border-2 border-gray-200 text-gray-600 hover:bg-gray-50">✕ ปิด</button>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    // ==================== SWEETNESS MODAL ====================
+    renderSweetnessModal() {
+        const p=this.state.sweetnessProduct; if(!p)return'';
+        return `<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+                <div class="text-center mb-5">
+                    <div class="flex items-center justify-center mb-2 text-4xl">${p.image}</div>
+                    <div class="text-lg font-bold">${p.name}</div>
+                    <div class="text-gray-500">฿${p.price}</div>
+                </div>
+                <div class="mb-5"><div class="font-semibold mb-3 text-sm text-gray-700">🍯 เลือกระดับความหวาน</div>
+                <div class="grid grid-cols-5 gap-2">${this.sweetnessLevels.map(s=>`<button data-sweet-select="${s.value}" class="p-3 border-2 border-gray-200 rounded-xl hover:border-gold-500 hover:bg-gold-50 transition text-center"><div class="text-sm font-bold">${s.label}</div></button>`).join('')}</div></div>
+                <button class="cancel-sweetness w-full py-3 border-2 border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50">ยกเลิก</button>
+            </div>
+        </div>`;
+    }
+
+    // ==================== SETTINGS MODAL ====================
+    renderSettingsModal() {
+        const hasUrl=!!this.state.googleSheetUrl, autoOn=this.state.autoExportSheets;
+        const hasSupa=!!this.state.supabaseUrl;
+        const activeTab=this.state.settingsTab||'sheets';
+        return `<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-2xl max-w-2xl w-full mx-4" style="max-height:90vh;overflow-y:auto">
+                <div class="flex items-center justify-between p-5 border-b border-gray-100">
+                    <h2 class="text-lg font-bold">⚙️ ตั้งค่าการเชื่อมต่อ</h2>
+                    <button class="close-settings text-gray-500 hover:text-gray-700 text-2xl">✕</button>
+                </div>
+                
+                <div class="flex border-b border-gray-100 px-5">
+                    <button data-settings-tab="sheets" class="py-3 px-4 text-sm font-medium border-b-2 ${activeTab==='sheets'?'border-gold-500 text-gold-600':'border-transparent text-gray-500'}">📊 Google Sheets</button>
+                    <button data-settings-tab="supabase" class="py-3 px-4 text-sm font-medium border-b-2 ${activeTab==='supabase'?'border-gold-500 text-gold-600':'border-transparent text-gray-500'}">☁️ Supabase</button>
+                </div>
+                <div class="p-5">
+                ${activeTab==='sheets'?`
+                    <div class="mb-4 p-3 rounded-lg ${hasUrl?'bg-green-50 border border-green-200':'bg-gray-50 border border-gray-200'}">
+                        <span class="text-sm">${hasUrl?'🟢 เชื่อมต่อ Google Sheets แล้ว':'⚪ ยังไม่ได้เชื่อมต่อ'}</span>
+                    </div>
+                    <div class="mb-4 p-4 bg-gold-50 border border-gold-200 rounded-xl">
+                        <div class="flex items-center justify-between">
+                            <div><div class="font-bold text-sm">⚡ ส่งอัตโนมัติทุกออเดอร์</div><div class="text-xs text-gray-600 mt-0.5">ทุกออเดอร์ส่งไป Sheets ทันที</div></div>
+                            <label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="auto-export-toggle" ${autoOn?'checked':''} ${!hasUrl?'disabled':''} class="sr-only peer"><div class="w-11 h-6 bg-gray-300 peer-checked:bg-gold-500 rounded-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div></label>
+                        </div>
+                    </div>
+                    <div class="mb-5"><label class="block text-sm font-bold mb-2">🔗 Google Apps Script URL</label>
+                    <input type="text" id="google-sheet-url" value="${this.state.googleSheetUrl}" placeholder="https://script.google.com/macros/s/xxxxx/exec" class="w-full px-4 py-2.5 border-2 rounded-xl text-sm focus:border-gold-500 focus:outline-none"/></div>
+                    <div class="flex gap-3">
+                        <button class="save-settings flex-1 py-3 btn-gold rounded-xl font-bold export-action-btn">💾 บันทึก</button>
+                        <button class="test-sheets-btn px-5 py-3 bg-gray-800 text-white rounded-xl font-bold hover:bg-gray-700 transition">🧪 ทดสอบ</button>
+                        <button class="close-settings px-5 py-3 border-2 border-gray-200 rounded-xl font-medium">ปิด</button>
+                    </div>
+                `:''}
+                ${activeTab==='supabase'?`
+                    <div class="mb-4 p-3 rounded-lg ${hasSupa?'bg-green-50 border border-green-200':'bg-gray-50 border border-gray-200'}">
+                        <span class="text-sm">${hasSupa?'🟢 เชื่อมต่อ Supabase แล้ว':'⚪ ยังไม่ได้ตั้งค่า Supabase'}</span>
+                    </div>
+                    <div class="space-y-4 mb-5">
+                        <div><label class="block text-sm font-bold mb-2">🔗 Supabase URL</label>
+                        <input type="text" id="supabase-url" value="${this.state.supabaseUrl}" placeholder="https://xxxx.supabase.co" class="w-full px-4 py-2.5 border-2 rounded-xl text-sm focus:border-gold-500 focus:outline-none"/></div>
+                        <div><label class="block text-sm font-bold mb-2">🔑 Supabase Anon Key</label>
+                        <input type="text" id="supabase-key" value="${this.state.supabaseKey}" placeholder="eyJhbGciOiJIUzI1NiIsInR5c..." class="w-full px-4 py-2.5 border-2 rounded-xl text-sm focus:border-gold-500 focus:outline-none"/></div>
+                    </div>
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-5">
+                        <div class="font-bold text-sm text-blue-800 mb-2">📋 ขั้นตอนตั้งค่า Supabase</div>
+                        <div class="text-xs text-blue-700 space-y-1">
+                            <p>1. ไปที่ <a href="https://supabase.com" target="_blank" class="underline font-bold">supabase.com</a> → สร้าง project ใหม่ (ฟรี)</p>
+                            <p>2. ไปที่ <strong>SQL Editor</strong> และรัน SQL นี้:</p>
+                            <pre class="bg-gray-900 text-green-400 p-3 rounded-lg text-xs mt-2 overflow-x-auto">CREATE TABLE orders (
+  id bigint PRIMARY KEY,
+  timestamp timestamptz,
+  items jsonb,
+  subtotal numeric,
+  total_cost numeric,
+  discount numeric,
+  vat numeric,
+  total numeric,
+  profit numeric,
+  staff_id text,
+  staff_name text
+);</pre>
+                            <p class="mt-2">3. ไปที่ <strong>Settings → API</strong> → คัดลอก URL และ anon key</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-3">
+                        <button class="save-supabase flex-1 py-3 btn-gold rounded-xl font-bold export-action-btn">☁️ บันทึก Supabase</button>
+                        <button class="close-settings px-5 py-3 border-2 border-gray-200 rounded-xl font-medium">ปิด</button>
+                    </div>
+                `:''}
+                </div>
+            </div>
+        </div>`;
+    }
+
+    // ==================== USER MANAGEMENT MODAL ====================
+    renderUserMgmtModal() {
+        const users=this.auth.users;
+        const roleLabel={owner:'เจ้าของ',manager:'ผู้จัดการ',staff:'พนักงาน'};
+        const roleCls={owner:'role-owner',manager:'role-manager',staff:'role-staff'};
+        return `<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-2xl max-w-2xl w-full mx-4" style="max-height:90vh;overflow-y:auto">
+                <div class="flex items-center justify-between p-5 border-b border-gray-100">
+                    <h2 class="text-lg font-bold">👥 จัดการผู้ใช้งาน</h2>
+                    <div class="flex gap-2">
+                        <button class="add-user-btn px-4 py-2 text-sm font-bold text-white rounded-xl" style="background:linear-gradient(135deg,#C9A96E,#b08a4a)">+ เพิ่มผู้ใช้</button>
+                        <button class="close-user-mgmt text-gray-500 hover:text-gray-700 text-2xl">✕</button>
+                    </div>
+                </div>
+                <div class="p-5">
+                    ${this.state.showAddUser?`
+                    <div class="bg-gold-50 border border-gold-200 rounded-xl p-4 mb-5">
+                        <div class="font-bold text-sm mb-3">➕ เพิ่มผู้ใช้ใหม่</div>
+                        <div class="grid grid-cols-2 gap-3 mb-3">
+                            <div><label class="text-xs font-bold mb-1 block">ชื่อผู้ใช้</label><input id="new-username" type="text" class="w-full px-3 py-2 border-2 rounded-lg text-sm focus:border-gold-500 focus:outline-none" placeholder="username"></div>
+                            <div><label class="text-xs font-bold mb-1 block">รหัสผ่าน</label><input id="new-password" type="text" class="w-full px-3 py-2 border-2 rounded-lg text-sm focus:border-gold-500 focus:outline-none" placeholder="password"></div>
+                            <div><label class="text-xs font-bold mb-1 block">ชื่อที่แสดง</label><input id="new-name" type="text" class="w-full px-3 py-2 border-2 rounded-lg text-sm focus:border-gold-500 focus:outline-none" placeholder="เช่น สมชาย"></div>
+                            <div><label class="text-xs font-bold mb-1 block">สิทธิ์</label><select id="new-role" class="w-full px-3 py-2 border-2 rounded-lg text-sm focus:border-gold-500 focus:outline-none"><option value="staff">พนักงาน</option><option value="manager">ผู้จัดการ</option><option value="owner">เจ้าของ</option></select></div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button class="confirm-add-user px-4 py-2 text-sm font-bold text-white rounded-lg" style="background:#107c10">✅ บันทึก</button>
+                            <button class="cancel-add-user px-4 py-2 text-sm border-2 border-gray-300 rounded-lg">ยกเลิก</button>
+                        </div>
+                    </div>
+                    `:''}
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50"><tr>
+                            <th class="px-4 py-2 text-left">ชื่อ</th><th class="px-4 py-2 text-left">Username</th>
+                            <th class="px-4 py-2 text-left">สิทธิ์</th><th class="px-4 py-2 text-center">จัดการ</th>
+                        </tr></thead>
+                        <tbody>${users.map(u=>`<tr class="border-t ${u.id===this.auth.currentUser?.id?'bg-gold-50':'hover:bg-gray-50'}">
+                            <td class="px-4 py-3 font-medium">${u.name}${u.id===this.auth.currentUser?.id?' <span class="text-xs text-gold-600">(คุณ)</span>':''}</td>
+                            <td class="px-4 py-3 text-gray-500">${u.username}</td>
+                            <td class="px-4 py-3"><span class="role-badge ${roleCls[u.role]||''}">${roleLabel[u.role]||u.role}</span></td>
+                            <td class="px-4 py-3 text-center">
+                                ${u.id!==this.auth.currentUser?.id?`<button data-delete-user="${u.id}" class="delete-user-btn text-red-500 hover:text-red-700 text-xs px-2 py-1 border border-red-200 rounded-lg">ลบ</button>`:'<span class="text-xs text-gray-400">—</span>'}
+                            </td>
+                        </tr>`).join('')}</tbody>
+                    </table>
+                    <div class="mt-4 p-3 bg-gray-50 rounded-xl text-xs text-gray-500">
+                        <div class="font-bold mb-1">📋 สิทธิ์การใช้งาน:</div>
+                        <div>• <span class="role-badge role-owner">เจ้าของ</span> เห็นทุกอย่าง + จัดการผู้ใช้ + ตั้งค่าระบบ</div>
+                        <div class="mt-1">• <span class="role-badge role-manager">ผู้จัดการ</span> ขายสินค้า + ดูรายงานทั้งหมด</div>
+                        <div class="mt-1">• <span class="role-badge role-staff">พนักงาน</span> ขายสินค้า + ดูประวัติออเดอร์</div>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    // ==================== IMAGE MANAGEMENT MODAL ====================
+    renderImageMgmtModal() {
+        const p=this.state.imageProduct; if(!p)return'';
+        const hasImg=!!this.getProductImage(p.id);
+        return `<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-bold">📷 รูปภาพสินค้า</h3>
+                    <button class="close-image-mgmt text-gray-500 text-xl">✕</button>
+                </div>
+                <div class="text-center mb-4">
+                    <div class="text-4xl mb-1">${p.image}</div>
+                    <div class="font-bold text-sm">${p.name}</div>
+                    <div class="text-gray-500 text-sm">฿${p.price}</div>
+                </div>
+                ${hasImg?`<div class="mb-4 text-center"><img src="${this.getProductImage(p.id)}" class="w-32 h-32 object-cover rounded-xl mx-auto border-2 border-gold-200"></div>`:''}
+                <div class="img-upload-zone mb-4" id="img-drop-zone">
+                    <input type="file" id="img-file-input" accept="image/*" class="hidden">
+                    <div class="text-2xl mb-1">📷</div>
+                    <div class="text-sm font-medium text-gray-600">คลิกเพื่ออัปโหลดรูปภาพ</div>
+                    <div class="text-xs text-gray-400 mt-1">รองรับ JPG, PNG, WEBP (สูงสุด 2MB)</div>
+                    <div class="text-xs text-orange-500 mt-1">⚠️ เมื่อ Offline รูปจาก URL จะแสดง Emoji แทน</div>
+                </div>
+                <div class="flex gap-2">
+                    <button class="pick-img-btn flex-1 py-2.5 text-sm font-bold text-white rounded-xl" style="background:linear-gradient(135deg,#C9A96E,#b08a4a)">📂 เลือกรูป</button>
+                    ${hasImg?`<button class="remove-img-btn px-4 py-2.5 text-sm border-2 border-red-200 text-red-500 rounded-xl font-medium">🗑️ ลบรูป</button>`:''}
+                    <button class="close-image-mgmt px-4 py-2.5 text-sm border-2 border-gray-200 rounded-xl">ปิด</button>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    // ==================== DEMO MODAL ====================
+    renderDemoModal() {
+        return `<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-2xl p-6 max-w-lg w-full mx-4 shadow-2xl">
+                <div class="flex items-center justify-between mb-4"><h2 class="text-xl font-bold">🧪 สร้างข้อมูลจำลอง</h2><button class="close-demo text-gray-500 hover:text-gray-700 text-2xl">✕</button></div>
+                <div class="bg-amber-50 border border-gold-200 rounded-xl p-3 mb-5"><p class="text-xs text-gold-800">💡 สร้างข้อมูลออเดอร์จำลอง เพื่อทดสอบระบบรายงาน, Dashboard, วิเคราะห์กำไร</p></div>
+                <div class="space-y-4 mb-6">
+                    <div><label class="block text-sm font-bold mb-2">📅 จำนวนเดือนย้อนหลัง</label>
+                    <div class="flex gap-2">${[1,2,3,6,12].map(m=>`<button data-demo-months="${m}" class="demo-month-btn px-4 py-2 border-2 rounded-xl text-sm font-medium transition ${this.state.demoMonths===m?'border-gold-500 bg-gold-50 text-gold-700':'border-gray-200 hover:border-gold-300'}">${m} เดือน</button>`).join('')}</div></div>
+                    <div><label class="block text-sm font-bold mb-2">🧾 จำนวนออเดอร์ต่อวัน</label>
+                    <div class="flex gap-2">${[['5-10','น้อย'],['15-30','กลาง'],['30-60','เยอะ'],['60-100','มากๆ']].map(([v,l])=>`<button data-demo-orders="${v}" class="demo-orders-btn px-4 py-2 border-2 rounded-xl text-sm font-medium transition ${this.state.demoOrdersPerDay===v?'border-gold-500 bg-gold-50 text-gold-700':'border-gray-200 hover:border-gold-300'}"><div>${l}</div><div class="text-xs text-gray-400">${v}</div></button>`).join('')}</div></div>
+                    <label class="flex items-center gap-3"><input type="checkbox" id="demo-peak" ${this.state.demoPeakHour?'checked':''} class="w-4 h-4 accent-gold-500"/><span class="text-sm">⏰ จำลอง Peak Hour</span></label>
+                </div>
+                <div class="flex gap-3">
+                    <button class="generate-demo-btn flex-1 py-3 bg-gray-800 text-white rounded-xl font-bold transition hover:bg-gray-900">🚀 สร้างข้อมูลจำลอง</button>
+                    <button class="close-demo px-6 py-3 border-2 border-gray-200 rounded-xl font-medium">ยกเลิก</button>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    // ==================== REPORTS ====================
+    renderReports() {
+        const tab=this.state.reportTab;const months=this.getAvailableMonths();
+        // Staff only sees history of their own orders
+        const tabs = this.auth.can('all_reports')
+            ? [{id:'dashboard',label:'📈 Dashboard'},{id:'profit',label:'💰 วิเคราะห์กำไร'},{id:'bundle',label:'🎯 จัดชุดโปร'},{id:'stock',label:'📦 วางแผนสต็อก'},{id:'export',label:'📤 ดึงข้อมูล'},{id:'history',label:'📝 ประวัติขาย'}]
+            : [{id:'history',label:'📝 ประวัติขาย'}];
+        const activeTab = tabs.find(t=>t.id===tab)?tab:tabs[0]?.id;
+        return `<div class="flex-1 p-5 overflow-auto" style="background:#f5f3ef">
+            <div class="max-w-7xl mx-auto">
+                <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+                    <div class="flex items-center gap-3">
+                        <h1 class="text-xl font-bold">📊 รายงาน & วิเคราะห์</h1>
+                        ${activeTab!=='export'?`<select id="month-filter" class="px-3 py-1.5 border-2 border-gold-300 rounded-lg bg-white text-sm font-medium"><option value="all" ${this.state.selectedMonth==='all'?'selected':''}>ทั้งหมด</option>${months.map(m=>`<option value="${m}" ${this.state.selectedMonth===m?'selected':''}>${this.getMonthName(m)}</option>`).join('')}</select>`:''}
+                    </div>
+                </div>
+                <div class="flex gap-1 mb-4 flex-wrap">${tabs.map(t=>`<button data-tab="${t.id}" class="tab-btn ${(activeTab||tab)===t.id?'active':''}">${t.label}</button>`).join('')}</div>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100">
+                    ${activeTab==='dashboard'?this.renderDashboardTab():''}
+                    ${activeTab==='profit'?this.renderProfitTab():''}
+                    ${activeTab==='bundle'?this.renderBundleTab():''}
+                    ${activeTab==='stock'?this.renderStockTab():''}
+                    ${activeTab==='export'?this.renderExportTab():''}
+                    ${activeTab==='history'?this.renderHistoryTab():''}
+                </div>
+            </div>
+        </div>`;
+    }
+
+    renderExportTab(){const p=this.state.exportPeriod;const orders=this.getExportOrders();const stats=this.calcExportStats(orders);const label=this.getExportLabel();const availYears=[...new Set(this.state.orders.map(o=>String(new Date(o.timestamp).getFullYear())))].sort().reverse();return`<div class="p-5"><div class="bg-gold-50 border border-gold-200 rounded-xl p-5 mb-6"><h3 class="font-bold text-sm mb-3">📅 เลือกช่วงเวลา</h3><div class="flex gap-2 mb-4">${[{id:'day',label:'📆 รายวัน'},{id:'week',label:'📅 สัปดาห์'},{id:'month',label:'🗓️ รายเดือน'},{id:'year',label:'📊 รายปี'}].map(t=>`<button data-export-period="${t.id}" class="period-btn ${p===t.id?'active':''}">${t.label}</button>`).join('')}</div><div class="flex items-center gap-4 flex-wrap">${p==='day'?`<div class="flex items-center gap-2"><label class="text-sm font-medium">วันที่:</label><input type="date" id="export-date" value="${this.state.exportDate}" class="date-input"/></div><div class="flex gap-1"><button class="date-nav-btn px-3 py-1 bg-white border rounded text-sm" data-date-nav="prev">◀</button><button class="date-nav-btn px-3 py-1 bg-gold-500 text-white rounded text-sm" data-date-nav="today">วันนี้</button><button class="date-nav-btn px-3 py-1 bg-white border rounded text-sm" data-date-nav="next">▶</button></div>`:''} ${p==='week'?`<input type="week" id="export-week" value="${this.state.exportWeek}" class="date-input"/>`:''} ${p==='month'?`<input type="month" id="export-month" value="${this.state.exportMonth}" class="date-input"/>`:''} ${p==='year'?`<select id="export-year" class="date-input">${availYears.map(y=>`<option value="${y}" ${this.state.exportYear===y?'selected':''}>${parseInt(y)+543}</option>`).join('')}</select>`:''}<div class="ml-auto text-sm font-medium text-gold-700">📋 ${label}</div></div></div><div class="grid grid-cols-5 gap-3 mb-6"><div class="bg-white p-4 rounded-xl border text-center"><div class="text-xs text-emerald-800">💰 ยอดขาย</div><div class="text-xl font-bold text-emerald-800">฿${stats.revenue.toFixed(0)}</div></div><div class="bg-white p-4 rounded-xl border text-center"><div class="text-xs text-navy-500">📈 กำไร</div><div class="text-xl font-bold text-navy-500">฿${stats.profit.toFixed(0)}</div></div><div class="bg-white p-4 rounded-xl border text-center"><div class="text-xs text-gray-700">🧾 ออเดอร์</div><div class="text-xl font-bold text-gray-700">${stats.orderCount}</div></div><div class="bg-white p-4 rounded-xl border text-center"><div class="text-xs text-gold-700">📦 ชิ้น</div><div class="text-xl font-bold text-gold-700">${stats.items}</div></div><div class="bg-white p-4 rounded-xl border text-center"><div class="text-xs text-gold-700">% กำไร</div><div class="text-xl font-bold text-gold-700">${stats.margin.toFixed(1)}%</div></div></div><div class="bg-gray-50 rounded-xl p-5 border-2 border-dashed border-gray-300"><h3 class="font-bold text-sm mb-3">📤 ดึงข้อมูลออก</h3><div class="flex gap-3 flex-wrap"><button class="export-period-csv export-action-btn bg-green-500 text-white hover:bg-emerald-800">📥 ดาวน์โหลด CSV</button><button class="export-period-sheets export-action-btn bg-blue-500 text-white hover:bg-navy-600">📊 ส่งไป Google Drive</button></div><div class="text-xs text-gray-500 mt-3">💡 ข้อมูลที่จะ Export: <strong>${label}</strong> (${orders.length} ออเดอร์)</div></div></div>`;}
+
+    renderProfitTab(){const a=this.getProductAnalytics();if(!a.length)return'<div class="p-8 text-center text-gray-400">ยังไม่มีข้อมูล</div>';const mxQ=Math.max(...a.map(p=>p.quantity)),mxP=Math.max(...a.map(p=>p.profitPerUnit));const cl=a.map(p=>({...p,signal:this.classifyProduct(p,mxQ,mxP)}));const stars=cl.filter(p=>p.signal.label.includes('Star')),reviews=cl.filter(p=>p.signal.label.includes('Review'));return`<div class="p-5"><div class="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-5"><h3 class="font-bold text-sm mb-2">💡 BCG Matrix</h3><div class="grid grid-cols-4 gap-3 text-xs"><div class="flex items-center gap-2"><span class="px-2 py-1 rounded signal-star text-xs">⭐ Star</span> ขายดี+กำไรสูง</div><div class="flex items-center gap-2"><span class="px-2 py-1 rounded signal-keep text-xs">🔄 Volume</span> ขายดีกำไรน้อย</div><div class="flex items-center gap-2"><span class="px-2 py-1 rounded signal-warn text-xs">💎 Niche</span> กำไรสูงขายน้อย</div><div class="flex items-center gap-2"><span class="px-2 py-1 rounded signal-drop text-xs">⚠️ Review</span> พิจารณาเลิก</div></div></div><div class="overflow-x-auto"><table class="w-full text-xs"><thead class="bg-gray-50"><tr><th class="px-3 py-2 text-left">สัญญาณ</th><th class="px-3 py-2 text-left">สินค้า</th><th class="px-3 py-2 text-left">หมวด</th><th class="px-3 py-2 text-right">จำนวน</th><th class="px-3 py-2 text-right">รายได้</th><th class="px-3 py-2 text-right">กำไร/ชิ้น</th><th class="px-3 py-2 text-right">%กำไร</th><th class="px-3 py-2 text-right">กำไรรวม</th></tr></thead><tbody>${cl.sort((a,b)=>{const o={'⭐ Star':0,'🔄 Volume':1,'💎 Niche':2,'⚠️ Review':3};return(o[a.signal.label]||9)-(o[b.signal.label]||9)||b.profit-a.profit;}).map(p=>`<tr class="border-t hover:bg-gray-50"><td class="px-3 py-2"><span class="px-2 py-0.5 rounded text-xs ${p.signal.cls}">${p.signal.label}</span></td><td class="px-3 py-2 font-medium">${p.name}</td><td class="px-3 py-2 text-gray-500">${this.getCategoryName(p.category)}</td><td class="px-3 py-2 text-right">${p.quantity}</td><td class="px-3 py-2 text-right">฿${p.revenue.toFixed(0)}</td><td class="px-3 py-2 text-right font-bold ${p.profitPerUnit>=30?'text-emerald-700':p.profitPerUnit>=20?'text-blue-600':'text-red-500'}">฿${p.profitPerUnit.toFixed(0)}</td><td class="px-3 py-2 text-right">${p.profitMargin.toFixed(1)}%</td><td class="px-3 py-2 text-right font-bold text-emerald-700">฿${p.profit.toFixed(0)}</td></tr>`).join('')}</tbody></table></div><div class="grid grid-cols-2 gap-6 mt-6"><div class="bg-green-50 border border-green-200 rounded-xl p-4"><h4 class="font-bold text-sm text-green-800 mb-2">✅ ควรโฟกัส (${stars.length})</h4><div class="text-xs text-emerald-800 space-y-1">${stars.slice(0,5).map(p=>`<div>• <strong>${p.name}</strong> — กำไร/ชิ้น ฿${p.profitPerUnit.toFixed(0)}, ขาย ${p.quantity}</div>`).join('')}${!stars.length?'<div class="text-gray-400">ยังไม่มีข้อมูล</div>':''}</div></div><div class="bg-red-50 border border-red-200 rounded-xl p-4"><h4 class="font-bold text-sm text-red-800 mb-2">⚠️ พิจารณาเลิก (${reviews.length})</h4><div class="text-xs text-red-700 space-y-1">${reviews.slice(0,5).map(p=>`<div>• <strong>${p.name}</strong> — กำไร/ชิ้น ฿${p.profitPerUnit.toFixed(0)}, ขายแค่ ${p.quantity}</div>`).join('')}${!reviews.length?'<div class="text-gray-400">ยังไม่มีข้อมูล</div>':''}</div></div></div></div>`;}
+
+    renderBundleTab(){const b=this.getBundleSuggestions();const a=this.getProductAnalytics();if(!a.length)return'<div class="p-8 text-center text-gray-400">ยังไม่มีข้อมูล</div>';return`<div class="p-5"><div class="bg-purple-50 border border-purple-200 rounded-xl p-4 mb-5"><h3 class="font-bold text-sm mb-1">🎯 จับคู่สินค้าขายดี + ขายช้า (ลด 10%)</h3></div>${!b.length?'<div class="text-center py-8 text-gray-400">ยังไม่มีข้อมูลเพียงพอ</div>':`<div class="grid grid-cols-2 gap-4">${b.map((x,i)=>`<div class="border-2 border-dashed border-gold-300 rounded-xl p-4 bg-gold-50"><div class="flex items-center gap-2 mb-3"><div class="w-7 h-7 bg-gold-500 text-white rounded-full flex items-center justify-center text-xs font-bold">${i+1}</div><div class="font-bold text-sm">ชุดที่ ${i+1}</div><span class="ml-auto text-xs px-2 py-1 bg-green-100 text-emerald-800 rounded-full">กำไร ฿${x.bundleProfit.toFixed(0)}</span></div><div class="flex items-center gap-2 mb-2"><div class="flex-1 bg-white rounded-lg p-2 text-center"><div class="text-xs text-gray-500">⭐ ตัวดึง</div><div class="text-xs font-bold">${x.star}</div></div><div class="text-xl">+</div><div class="flex-1 bg-white rounded-lg p-2 text-center"><div class="text-xs text-gray-500">📦 ตัวเสริม</div><div class="text-xs font-bold">${x.slow}</div></div></div><div class="flex items-center justify-between text-xs"><div>ปกติ <span class="line-through text-gray-400">฿${x.originalTotal}</span></div><div class="font-bold text-lg text-gold-600">฿${x.bundlePrice}</div><div class="text-emerald-700">Margin ${x.profitMargin.toFixed(0)}%</div></div></div>`).join('')}</div>`}</div>`;}
+
+    renderStockTab(){const st=this.getStockInsights();if(!st.daily.length)return'<div class="p-8 text-center text-gray-400">ยังไม่มีข้อมูล</div>';return`<div class="p-5"><div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-5"><h3 class="font-bold text-sm mb-1">📦 สต็อกแนะนำ = เฉลี่ย/วัน + Buffer 30%</h3><p class="text-xs text-navy-500">📅 ข้อมูลจาก ${st.daysCount} วัน</p></div>${st.peakHours.length?`<div class="mb-6"><h3 class="font-bold text-sm mb-3">⏰ Peak Hours</h3><div class="flex gap-1 flex-wrap">${Array.from({length:24},(_,h)=>{const f=st.peakHours.find(p=>p.hour===h);const c=f?f.count:0;const mx=st.peakHours[0]?.count||1;const int=c/mx;const bg=int>.7?'bg-red-500 text-white':int>.4?'bg-gold-400 text-white':int>.1?'bg-yellow-200':'bg-gray-100 text-gray-400';return`<div class="w-10 h-10 rounded-lg flex flex-col items-center justify-center text-xs ${bg}"><div class="font-bold">${String(h).padStart(2,'0')}</div><div style="font-size:9px">${c||''}</div></div>`;}).join('')}</div></div>`:''}<div class="overflow-x-auto"><table class="w-full text-xs"><thead class="bg-gray-50"><tr><th class="px-3 py-2 text-left">สินค้า</th><th class="px-3 py-2 text-left">หมวด</th><th class="px-3 py-2 text-right">ขายรวม</th><th class="px-3 py-2 text-right">เฉลี่ย/วัน</th><th class="px-3 py-2 text-right">🎯 สต็อก/วัน</th><th class="px-3 py-2 text-center">ระดับ</th></tr></thead><tbody>${st.daily.slice(0,30).map(d=>{const lv=d.avgPerDay>=5?'🔴 สูง':d.avgPerDay>=2?'🟡 กลาง':'🟢 ต่ำ';return`<tr class="border-t hover:bg-gray-50"><td class="px-3 py-2 font-medium">${d.name}</td><td class="px-3 py-2 text-gray-500">${this.getCategoryName(d.category)}</td><td class="px-3 py-2 text-right">${d.totalQty}</td><td class="px-3 py-2 text-right">${d.avgPerDay.toFixed(1)}</td><td class="px-3 py-2 text-right font-bold text-blue-600">${d.suggestedStock}</td><td class="px-3 py-2 text-center">${lv}</td></tr>`;}).join('')}</tbody></table></div></div>`;}
+
+    renderHistoryTab(){
+        const fo = this.auth.can('all_reports')
+            ? this.getFilteredOrders()
+            : this.state.orders.filter(o=>o.staffId===this.auth.currentUser?.id);
+        return`<div class="p-5">${!fo.length?'<div class="text-center py-8 text-gray-400">ไม่มีข้อมูล</div>':`<div class="overflow-x-auto"><table class="w-full text-xs"><thead class="bg-gray-50"><tr><th class="px-3 py-2 text-left">วันที่/เวลา</th><th class="px-3 py-2 text-left">รายการ</th><th class="px-3 py-2 text-left">พนักงาน</th><th class="px-3 py-2 text-right">ยอดรวม</th><th class="px-3 py-2 text-right">ส่วนลด</th><th class="px-3 py-2 text-right">VAT</th><th class="px-3 py-2 text-right">สุทธิ</th><th class="px-3 py-2 text-right">กำไร</th></tr></thead><tbody>${fo.map(o=>{const d=new Date(o.timestamp);return`<tr class="border-t hover:bg-gray-50"><td class="px-3 py-2"><div>${d.toLocaleDateString('th-TH')}</div><div class="text-gray-400">${d.toLocaleTimeString('th-TH')}</div></td><td class="px-3 py-2">${o.items.map(i=>`${i.name}x${i.quantity}`).join(', ')}</td><td class="px-3 py-2 text-gray-500">${o.staffName||'—'}</td><td class="px-3 py-2 text-right">฿${o.subtotal.toFixed(2)}</td><td class="px-3 py-2 text-right text-red-500">-฿${o.discount.toFixed(2)}</td><td class="px-3 py-2 text-right">฿${o.vat.toFixed(2)}</td><td class="px-3 py-2 text-right font-bold">฿${o.total.toFixed(2)}</td><td class="px-3 py-2 text-right font-bold text-emerald-700">฿${o.profit.toFixed(2)}</td></tr>`;}).join('')}</tbody></table></div>`}</div>`;
+    }
+
+    // ==================== DASHBOARD (kept from original, simplified) ====================
+    renderDashboardTab() {
+        const allOrders=this.getFilteredOrders();
+        if(!allOrders.length) return '<div class="p-8 text-center text-gray-400"><div class="text-4xl mb-2">📊</div>ยังไม่มีข้อมูล สร้างข้อมูลจำลองเพื่อทดสอบได้</div>';
+        const dp=this.state.dashPeriod;
+        const {orders,prevOrders,periodLabel,prevLabel}=this.getDashFilteredOrders(allOrders);
+        const agg=this.aggregateDashboardData(orders);
+        const prevAgg=prevOrders.length?this.aggregateDashboardData(prevOrders):null;
+        const st=this.state.dashSubTab;
+        const availMonths=this.getAvailableMonths();
+        const availYears=[...new Set(allOrders.map(o=>String(new Date(o.timestamp).getFullYear())))].sort().reverse();
+        const availWeeks=this.getAvailableWeeks(allOrders);
+        return`<div><div style="background:#faf9f6;border-bottom:1px solid #eae7e0;padding:10px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:11px;color:#888;font-weight:600">🔽 ช่วงเวลา:</span><div style="display:flex;gap:4px">${[{id:'all',l:'ทั้งหมด'},{id:'day',l:'📆 รายวัน'},{id:'week',l:'📅 สัปดาห์'},{id:'month',l:'🗓 เดือน'},{id:'year',l:'📊 ปี'}].map(t=>`<button data-dash-period="${t.id}" class="fbtn-dash ${dp===t.id?'active':''}">${t.l}</button>`).join('')}</div>${dp!=='all'?`<label style="display:flex;align-items:center;gap:5px;font-size:11px;color:#666;cursor:pointer"><input type="checkbox" id="dash-compare" ${this.state.dashCompare?'checked':''} style="accent-color:#C9A96E"/>🔄 เทียบกัน</label>`:''}</div>
+        ${dp!=='all'?`<div style="background:white;border-bottom:1px solid #eae7e0;padding:8px 20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><div style="flex:1;display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:8px;background:#e8f4fd;border:1px solid #b3d9f5"><span style="font-size:10px;font-weight:700;color:#0078d4">A</span>${dp==='day'?`<input type="date" id="dash-date" value="${this.state.dashDate}" class="date-input" style="font-size:12px"><div style="display:flex;gap:2px"><button class="dash-nav" data-dash-nav="prev-day" style="padding:2px 8px;border:1px solid #ddd;border-radius:4px;font-size:10px;cursor:pointer;background:white">◀</button><button class="dash-nav" data-dash-nav="today" style="padding:2px 8px;border-radius:4px;font-size:10px;cursor:pointer;background:#0078d4;color:white;border:none">วันนี้</button><button class="dash-nav" data-dash-nav="next-day" style="padding:2px 8px;border:1px solid #ddd;border-radius:4px;font-size:10px;cursor:pointer;background:white">▶</button></div>`:''}${dp==='week'?`<select id="dash-week" class="date-input" style="font-size:12px">${availWeeks.map(w=>`<option value="${w.key}" ${w.key===this.state.dashWeekOffset+''?'selected':''}>${w.label}</option>`).join('')}</select>`:''} ${dp==='month'?`<select id="dash-month" class="date-input" style="font-size:12px">${availMonths.map(m=>`<option value="${m}" ${m===this.state.dashMonthKey?'selected':''}>${this.getMonthNameFull(m)}</option>`).join('')}</select>`:''} ${dp==='year'?`<select id="dash-year" class="date-input" style="font-size:12px">${availYears.map(y=>`<option value="${y}" ${y===this.state.dashYear?'selected':''}>${parseInt(y)+543}</option>`).join('')}</select>`:''}</div></div>`:''}
+        <div style="background:white;border-bottom:1px solid #eae7e0;padding:6px 20px;font-size:11px;display:flex;gap:12px"><span style="font-weight:700;color:#0078d4">📅 A: ${periodLabel}</span><span style="color:#888">${orders.length.toLocaleString()} ออเดอร์</span></div>
+        <div class="flex gap-1 px-4 pt-3" style="border-bottom:1px solid #eae7e0">${[{id:'overview',l:'📊 ภาพรวม'},{id:'products',l:'🏆 สินค้า'},{id:'time',l:'⏰ ช่วงเวลา'},{id:'detail',l:'📋 รายละเอียด'}].map(t=>`<button data-dash-sub="${t.id}" class="pbi-stab ${st===t.id?'active':''}">${t.l}</button>`).join('')}</div>
+        <div class="p-5">${st==='overview'?this.renderPBIOverview(agg,orders,prevAgg):''}${st==='products'?this.renderPBIProducts(agg,orders):''}${st==='time'?this.renderPBITime(agg):''}${st==='detail'?this.renderPBIDetail(agg):''}</div></div>`;
+    }
+
+    getAvailableWeeks(orders){const weeks=[];if(!orders.length)return weeks;const dates=orders.map(o=>new Date(o.timestamp)).sort((a,b)=>b-a);const now=new Date();now.setHours(0,0,0,0);const day=now.getDay();const diff=now.getDate()-day+(day===0?-6:1);const thisMonday=new Date(now);thisMonday.setDate(diff);const earliest=new Date(Math.min(...dates));earliest.setHours(0,0,0,0);let d=new Date(thisMonday);let offset=0;while(d>=earliest&&offset<52){const end=new Date(d);end.setDate(d.getDate()+6);const dd=d.getDate(),mm=d.getMonth()+1,dd2=end.getDate(),mm2=end.getMonth()+1;const mTh=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];weeks.push({key:String(offset),label:`${dd} ${mTh[mm]} - ${dd2} ${mTh[mm2]} ${end.getFullYear()+543}`,start:new Date(d),end:new Date(end)});d.setDate(d.getDate()-7);offset++;}return weeks;}
+
+    getDashFilteredOrders(allOrders){const dp=this.state.dashPeriod;const mTh=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];const fmtDate=(dk)=>{const[y,m,d]=dk.split('-');return`${parseInt(d)} ${mTh[parseInt(m)]} ${parseInt(y)+543}`;};if(dp==='all')return{orders:allOrders,prevOrders:[],periodLabel:'ทั้งหมด',prevLabel:''};if(dp==='day'){const dk=this.state.dashDate;const orders=allOrders.filter(o=>o.timestamp.startsWith(dk));const dk2=this.state.dashDate2;const prevOrders=this.state.dashCompare?allOrders.filter(o=>o.timestamp.startsWith(dk2)):[];return{orders,prevOrders,periodLabel:fmtDate(dk),prevLabel:fmtDate(dk2)};}if(dp==='week'){const weeks=this.getAvailableWeeks(allOrders);const fW=(offset)=>{const w=weeks.find(w=>w.key===String(offset));if(!w)return{orders:[],label:'—'};const s=new Date(w.start);s.setHours(0,0,0,0);const e=new Date(w.end);e.setHours(23,59,59,999);return{orders:allOrders.filter(o=>{const t=new Date(o.timestamp);return t>=s&&t<=e;}),label:w.label};};const a=fW(parseInt(this.state.dashWeekOffset)||0);const b=this.state.dashCompare?fW(parseInt(this.state.dashWeekOffset2)||1):{orders:[],label:''};return{orders:a.orders,prevOrders:b.orders,periodLabel:a.label,prevLabel:b.label};}if(dp==='month'){const mk=this.state.dashMonthKey;const orders=allOrders.filter(o=>{const d=new Date(o.timestamp);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`===mk;});const mk2=this.state.dashMonthKey2;const prevOrders=this.state.dashCompare?allOrders.filter(o=>{const d=new Date(o.timestamp);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`===mk2;}):[];return{orders,prevOrders,periodLabel:this.getMonthNameFull(mk),prevLabel:this.getMonthNameFull(mk2)};}if(dp==='year'){const yk=this.state.dashYear;const orders=allOrders.filter(o=>o.timestamp.startsWith(yk));const yk2=this.state.dashYear2;const prevOrders=this.state.dashCompare?allOrders.filter(o=>o.timestamp.startsWith(yk2)):[];return{orders,prevOrders,periodLabel:`ปี พ.ศ. ${parseInt(yk)+543}`,prevLabel:`ปี พ.ศ. ${parseInt(yk2)+543}`};}return{orders:allOrders,prevOrders:[],periodLabel:'',prevLabel:''};}
+
+    aggregateDashboardData(orders){const daily={},hourly={},prodMap={},catMap={};orders.forEach(o=>{const d=new Date(o.timestamp);const dk=d.toISOString().split('T')[0];const h=d.getHours();if(!daily[dk])daily[dk]={date:dk,rev:0,cost:0,profit:0,orders:0,items:0};daily[dk].rev+=o.total;daily[dk].cost+=o.totalCost;daily[dk].profit+=o.profit;daily[dk].orders++;daily[dk].items+=o.items.reduce((s,i)=>s+i.quantity,0);if(!hourly[h])hourly[h]={hour:h,rev:0,orders:0};hourly[h].rev+=o.total;hourly[h].orders++;o.items.forEach(item=>{const k=item.originalName||item.name;if(!prodMap[k])prodMap[k]={name:k,catKey:item.category,cat:this.getCategoryName(item.category),qty:0,rev:0,cost:0,profit:0};prodMap[k].qty+=item.quantity;prodMap[k].rev+=item.price*item.quantity;prodMap[k].cost+=item.cost*item.quantity;prodMap[k].profit+=(item.price-item.cost)*item.quantity;const ck=item.category;if(!catMap[ck])catMap[ck]={name:this.getCategoryName(ck),catKey:ck,rev:0,qty:0,profit:0,color:({coffee:'#0078d4',tea:'#107c10',softdrink:'#d83b01',bakery:'#8764b8',promotion:'#f2a500',other:'#8a8886'})[ck]||'#ccc'};catMap[ck].rev+=item.price*item.quantity;catMap[ck].qty+=item.quantity;catMap[ck].profit+=(item.price-item.cost)*item.quantity;});});const dailyArr=Object.values(daily).sort((a,b)=>a.date.localeCompare(b.date));return{daily:dailyArr,hourly:Object.values(hourly).sort((a,b)=>a.hour-b.hour),prodMap,catMap,totalOrders:orders.length,totalRev:orders.reduce((s,o)=>s+o.total,0),totalProfit:orders.reduce((s,o)=>s+o.profit,0),totalItems:orders.reduce((s,o)=>s+o.items.reduce((ss,i)=>ss+i.quantity,0),0),totalCost:orders.reduce((s,o)=>s+o.totalCost,0)};}
+
+    renderPBIOverview(agg,orders,prevAgg){const{daily,catMap,totalOrders,totalRev,totalProfit,totalItems}=agg;const days=Math.max(daily.length,1);const margin=totalRev>0?(totalProfit/totalRev*100):0;const pRev=prevAgg?.totalRev||0,pProfit=prevAgg?.totalProfit||0,pOrders=prevAgg?.totalOrders||0,pItems=prevAgg?.totalItems||0;const cmp=(a,b)=>{if(!b)return'';const d=((a-b)/b*100).toFixed(1);return d>0?`<span class="pbi-badge up">▲${d}%</span>`:`<span class="pbi-badge dn">▼${Math.abs(d)}%</span>`;};const cats=Object.entries(catMap).sort((a,b)=>b[1].rev-a[1].rev);const catTotal=cats.reduce((s,[,c])=>s+c.rev,0);return`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px"><div class="pbi-kpi c1"><div style="font-size:18px;margin-bottom:2px">💰</div><div style="font-size:10px;color:#888">ยอดขายรวม</div><div style="font-size:24px;font-weight:700">฿${Math.round(totalRev).toLocaleString()}</div><div style="display:flex;align-items:center;gap:6px;margin-top:4px"><span class="pbi-badge up">${days} วัน</span>${cmp(totalRev,pRev)}<span style="font-size:9px;color:#aaa">~฿${Math.round(totalRev/days).toLocaleString()}/วัน</span></div></div><div class="pbi-kpi c2"><div style="font-size:18px;margin-bottom:2px">📈</div><div style="font-size:10px;color:#888">กำไรสุทธิ</div><div style="font-size:24px;font-weight:700">฿${Math.round(totalProfit).toLocaleString()}</div><div style="display:flex;align-items:center;gap:6px;margin-top:4px"><span class="pbi-badge up">Margin ${margin.toFixed(1)}%</span>${cmp(totalProfit,pProfit)}</div></div><div class="pbi-kpi c3"><div style="font-size:18px;margin-bottom:2px">🧾</div><div style="font-size:10px;color:#888">จำนวนออเดอร์</div><div style="font-size:24px;font-weight:700">${totalOrders.toLocaleString()}</div><div style="display:flex;align-items:center;gap:6px;margin-top:4px"><span class="pbi-badge neu">~${Math.round(totalOrders/days)}/วัน</span>${cmp(totalOrders,pOrders)}</div></div><div class="pbi-kpi c4"><div style="font-size:18px;margin-bottom:2px">📦</div><div style="font-size:10px;color:#888">จำนวนชิ้น</div><div style="font-size:24px;font-weight:700">${totalItems.toLocaleString()}</div><div style="display:flex;align-items:center;gap:6px;margin-top:4px"><span class="pbi-badge neu">~${Math.round(totalItems/days)}/วัน</span>${cmp(totalItems,pItems)}</div></div></div><div style="display:grid;grid-template-columns:3fr 2fr;gap:12px;margin-bottom:14px"><div class="pbi-card"><div class="pbi-card-header"><div class="pbi-card-title">📉 แนวโน้มยอดขาย</div><div class="pbi-actions"><button class="pbi-abtn ${(this._pbiLineMode||'rev')==='rev'?'active':''}" data-line-mode="rev">ยอดขาย</button><button class="pbi-abtn ${this._pbiLineMode==='profit'?'active':''}" data-line-mode="profit">กำไร</button><button class="pbi-abtn ${this._pbiLineMode==='orders'?'active':''}" data-line-mode="orders">ออเดอร์</button></div></div><canvas id="pbiLineChart" height="130"></canvas></div><div class="pbi-card"><div class="pbi-card-header"><div class="pbi-card-title">🍩 สัดส่วนหมวดหมู่</div><div class="pbi-actions"><button class="pbi-abtn active" data-donut-mode="rev">ยอดขาย</button><button class="pbi-abtn" data-donut-mode="qty">จำนวน</button></div></div><div style="display:flex;gap:12px;align-items:center"><canvas id="pbiDonutChart" width="120" height="120" style="flex-shrink:0"></canvas><div style="flex:1">${cats.map(([k,c])=>`<div class="dl-row"><div class="dl-dot" style="background:${c.color}"></div><div style="font-size:11px;flex:1">${c.name}</div><div style="font-size:11px;font-weight:700">฿${Math.round(c.rev).toLocaleString()}</div><div style="font-size:10px;color:#888;min-width:35px;text-align:right">${catTotal>0?(c.rev/catTotal*100).toFixed(1):0}%</div></div>`).join('')}</div></div></div></div><div class="pbi-card"><div class="pbi-card-header"><div class="pbi-card-title">📊 ยอดขายรายวัน</div></div><canvas id="pbiBarChart" height="90"></canvas></div>`;}
+
+    renderPBIProducts(agg){const tc=this.state.dashTopCat;const allProds=Object.values(agg.prodMap);const filtered=tc==='all'?allProds:allProds.filter(p=>p.catKey===tc);const top=filtered.sort((a,b)=>b.qty-a.qty).slice(0,10);const maxQty=top.length?Math.max(...top.map(p=>p.qty)):1;return`<div style="display:flex;gap:5px;margin-bottom:14px;flex-wrap:wrap;align-items:center"><span style="font-size:11px;color:#888;font-weight:600">📦 หมวดหมู่:</span><button data-dtop-cat="all" class="fbtn-dash ${tc==='all'?'active':''}">ทั้งหมด</button>${this.categories.map(c=>`<button data-dtop-cat="${c.id}" class="fbtn-dash ${tc===c.id?'active':''}">${c.icon} ${c.name}</button>`).join('')}</div>${!top.length?'<div class="text-center py-8 text-gray-400">ไม่มีข้อมูล</div>':`<div class="space-y-2">${top.map((p,i)=>`<div class="bar-container"><div class="bar-label">${['🥇','🥈','🥉'][i]||`${i+1}.`} ${p.name}</div><div class="bar-track"><div class="bar-fill" style="width:${(p.qty/maxQty*100).toFixed(1)}%"><span class="bar-value">${p.qty} ชิ้น | ฿${Math.round(p.rev).toLocaleString()}</span></div></div></div>`).join('')}</div>`}`;}
+
+    renderPBITime(agg){const {hourly}=agg;if(!hourly.length)return'<div class="text-center py-8 text-gray-400">ไม่มีข้อมูล</div>';const maxH=Math.max(...hourly.map(h=>h.orders));return`<div class="mb-6"><h4 class="font-bold text-sm mb-3">⏰ Peak Hours (ออเดอร์/ชั่วโมง)</h4><div class="flex gap-1 flex-wrap">${Array.from({length:24},(_,h)=>{const f=hourly.find(x=>x.hour===h);const c=f?f.orders:0;const int=c/maxH;const bg=int>.7?'bg-red-500 text-white':int>.4?'bg-gold-400 text-white':int>.1?'bg-yellow-200':'bg-gray-100 text-gray-400';return`<div class="w-10 h-10 rounded-lg flex flex-col items-center justify-center text-xs ${bg}"><div class="font-bold">${String(h).padStart(2,'0')}</div><div style="font-size:9px">${c||''}</div></div>`;}).join('')}</div></div><canvas id="pbiTimeChart" height="100"></canvas>`;}
+
+    renderPBIDetail(agg){const {daily}=agg;if(!daily.length)return'<div class="text-center py-8 text-gray-400">ไม่มีข้อมูล</div>';return`<div class="overflow-x-auto"><table class="w-full text-xs"><thead class="bg-gray-50"><tr><th class="px-3 py-2 text-left">วันที่</th><th class="px-3 py-2 text-right">ออเดอร์</th><th class="px-3 py-2 text-right">ชิ้น</th><th class="px-3 py-2 text-right">ยอดขาย</th><th class="px-3 py-2 text-right">ต้นทุน</th><th class="px-3 py-2 text-right">กำไร</th><th class="px-3 py-2 text-right">%กำไร</th></tr></thead><tbody>${daily.map(d=>`<tr class="border-t hover:bg-gray-50"><td class="px-3 py-2">${new Date(d.date+'T12:00:00').toLocaleDateString('th-TH',{weekday:'short',day:'numeric',month:'short'})}</td><td class="px-3 py-2 text-right">${d.orders}</td><td class="px-3 py-2 text-right">${d.items}</td><td class="px-3 py-2 text-right font-bold">฿${Math.round(d.rev).toLocaleString()}</td><td class="px-3 py-2 text-right text-red-500">฿${Math.round(d.cost).toLocaleString()}</td><td class="px-3 py-2 text-right font-bold text-emerald-700">฿${Math.round(d.profit).toLocaleString()}</td><td class="px-3 py-2 text-right ${d.rev>0&&d.profit/d.rev>.3?'text-emerald-700':'text-gray-600'}">${d.rev>0?(d.profit/d.rev*100).toFixed(1):0}%</td></tr>`).join('')}</tbody></table></div>`;}
+
+    initDashboardCharts(){
+        if(this.state.currentView!=='reports'||this.state.reportTab!=='dashboard')return;
+        if(!document.getElementById('pbiLineChart'))return;
+        const allOrders=this.getFilteredOrders();if(!allOrders.length)return;
+        const {orders}=this.getDashFilteredOrders(allOrders);
+        const agg=this.aggregateDashboardData(orders);
+        if(this._pbiCharts){Object.values(this._pbiCharts).forEach(c=>{try{c.destroy();}catch(e){}});} this._pbiCharts={};
+        const mode=this._pbiLineMode||'rev';
+        const lineEl=document.getElementById('pbiLineChart');
+        if(lineEl){const ctx=lineEl.getContext('2d');const labels=agg.daily.map(d=>new Date(d.date+'T12:00:00').toLocaleDateString('th-TH',{day:'numeric',month:'short'}));const data=agg.daily.map(d=>mode==='profit'?d.profit:mode==='orders'?d.orders:d.rev);this._pbiCharts.line=new Chart(ctx,{type:'line',data:{labels,datasets:[{label:mode==='profit'?'กำไร':mode==='orders'?'ออเดอร์':'ยอดขาย',data,borderColor:'#0078d4',backgroundColor:'#0078d410',fill:true,tension:.3,pointRadius:2,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`฿${Math.round(c.parsed.y).toLocaleString()}`}}},scales:{x:{ticks:{font:{size:9},maxTicksLimit:10},grid:{display:false}},y:{ticks:{font:{size:9},callback:v=>'฿'+Math.round(v).toLocaleString()},grid:{color:'#f5f3ef'}}}}});}
+        const donutEl=document.getElementById('pbiDonutChart');
+        if(donutEl){const ctx=donutEl.getContext('2d');const cats=Object.values(agg.catMap);const mode2=this._pbiDonutMode||'rev';this._pbiCharts.donut=new Chart(ctx,{type:'doughnut',data:{labels:cats.map(c=>c.name),datasets:[{data:cats.map(c=>mode2==='qty'?c.qty:c.rev),backgroundColor:cats.map(c=>c.color),borderWidth:2,borderColor:'white'}]},options:{responsive:false,plugins:{legend:{display:false}}}});}
+        const barEl=document.getElementById('pbiBarChart');
+        if(barEl){const ctx=barEl.getContext('2d');const labels=agg.daily.map(d=>new Date(d.date+'T12:00:00').toLocaleDateString('th-TH',{day:'numeric',month:'short'}));this._pbiCharts.bar=new Chart(ctx,{type:'bar',data:{labels,datasets:[{label:'ยอดขาย',data:agg.daily.map(d=>d.rev),backgroundColor:'#C9A96E55',borderColor:'#C9A96E',borderWidth:1},{label:'กำไร',data:agg.daily.map(d=>d.profit),backgroundColor:'#107c1055',borderColor:'#107c10',borderWidth:1}]},options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{labels:{font:{size:9}}}},scales:{x:{ticks:{font:{size:9},maxTicksLimit:14},grid:{display:false}},y:{ticks:{font:{size:9},callback:v=>'฿'+Math.round(v).toLocaleString()},grid:{color:'#f5f3ef'}}}}});}
+        const timeEl=document.getElementById('pbiTimeChart');
+        if(timeEl){const ctx=timeEl.getContext('2d');const hrs=Array.from({length:24},(_,h)=>h);const data=hrs.map(h=>{const f=agg.hourly.find(x=>x.hour===h);return f?f.orders:0;});this._pbiCharts.time=new Chart(ctx,{type:'bar',data:{labels:hrs.map(h=>`${String(h).padStart(2,'0')}:00`),datasets:[{label:'ออเดอร์',data,backgroundColor:data.map(v=>v===Math.max(...data)?'#C9A96E':'#e0ddd8'),borderRadius:4}]},options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:8},maxTicksLimit:12},grid:{display:false}},y:{ticks:{font:{size:9},stepSize:1},grid:{color:'#f5f3ef'}}}}});}
+    }
+
+    // ==================== DEMO DATA GENERATOR ====================
+    generateDemoData(){const[minOrders,maxOrders]=this.state.demoOrdersPerDay.split('-').map(Number);const months=this.state.demoMonths;const usePeak=this.state.demoPeakHour;const coffeeP=this.products.filter(p=>p.category==='coffee');const teaP=this.products.filter(p=>p.category==='tea');const softP=this.products.filter(p=>p.category==='softdrink');const bakeryP=this.products.filter(p=>p.category==='bakery');const otherP=this.products.filter(p=>p.category==='other'&&!p.isAddon);const promoP=this.products.filter(p=>p.category==='promotion');const allDrinks=[...coffeeP,...teaP,...softP];const allFood=[...bakeryP,...otherP,...promoP];const topDrinks=['ลาเต้ เย็น','คาปูชิโน่ เย็น','อเมริกาโน่ เย็น','ชาไทย เย็น','มอคค่า เย็น','ชาเขียวมัทฉะ เย็น','ส้มสมูทตี้'];const topFood=['ขนมปังปิ้งเนย+นม','เค้กช็อคโกแลต','แซนวิชแฮมชีส','คุกกี้ชิ้นใหญ่','วาฟเฟิล'];function wPool(items,tops){const p=[];items.forEach(i=>{const w=tops.includes(i.name)?4:1;for(let x=0;x<w;x++)p.push(i);});return p;}const drinkPool=wPool(allDrinks,topDrinks);const foodPool=wPool(allFood,topFood);function rand(min,max){return Math.floor(Math.random()*(max-min+1))+min;}function pick(arr){return arr[rand(0,arr.length-1)];}const sweets=[0,25,50,75,100];function rSweet(){return sweets[rand(0,sweets.length-1)];}const peakHours=usePeak?[7,8,9,11,12,13,15,16,17]:Array.from({length:14},(_,i)=>i+7);const newOrders=[];let totalGenerated=0;const startDate=new Date();startDate.setMonth(startDate.getMonth()-months);startDate.setHours(0,0,0,0);const currentDate=new Date(startDate);while(currentDate<=new Date()){const numOrders=rand(minOrders,maxOrders);for(let j=0;j<numOrders;j++){const orderTime=new Date(currentDate);const h=pick(peakHours);orderTime.setHours(h,rand(0,59),rand(0,59),0);const itemCount=rand(1,3);const items=[];for(let k=0;k<itemCount;k++){const isDrinkItem=Math.random()<.7;const product=isDrinkItem?pick(drinkPool):pick(foodPool);const qty=Math.random()<.85?1:2;let oi={...product,quantity:qty};if(product.isDrink){const sw=rSweet();oi.originalName=product.name;oi.name=`${product.name} (${sw}%)`;oi.sweetness=sw;}if(product.isDrink&&product.category==='coffee'&&Math.random()<.15){oi.extraShots=1;oi.price=product.price+10;}const ei=items.findIndex(it=>it.name===oi.name);if(ei>=0)items[ei].quantity+=qty;else items.push(oi);}const sub=items.reduce((s,it)=>s+it.price*it.quantity,0);const tc=items.reduce((s,it)=>s+it.cost*it.quantity,0);const disc=(sub*10)/100;const vat=(sub-disc)*.07;const tot=sub-disc+vat;const prof=tot-tc;newOrders.push({id:orderTime.getTime()+rand(0,999),timestamp:orderTime.toISOString(),items,subtotal:sub,totalCost:tc,discount:disc,vat,total:tot,profit:prof,staffName:'Demo'});totalGenerated++;}currentDate.setDate(currentDate.getDate()+1);}newOrders.sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));this._clearIDB();this.state.orders=newOrders;this._saveBatch(newOrders);this.state.showDemoGenerator=false;const tRev=newOrders.reduce((s,o)=>s+o.total,0);const tProf=newOrders.reduce((s,o)=>s+o.profit,0);alert(`✅ สร้างข้อมูลจำลองสำเร็จ!\n\n📊 ${totalGenerated.toLocaleString()} ออเดอร์\n💰 ยอดขาย ฿${tRev.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,',')}\n📈 กำไร ฿${tProf.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,',')}`);this.render();}
+    clearAllData(){if(confirm('⚠️ ยืนยันล้างข้อมูลทั้งหมด?\nไม่สามารถย้อนกลับได้!')){this.state.orders=[];this._clearIDB();alert('🗑️ ล้างข้อมูลทั้งหมดเรียบร้อย!');this.render();}}
+
+    // ==================== BIND LOGIN EVENTS ====================
+    bindLoginEvents() {
+        const doLogin=()=>{
+            const u=document.getElementById('login-username')?.value?.trim();
+            const p=document.getElementById('login-password')?.value;
+            if(!u||!p){this.state.loginError='กรุณากรอกชื่อผู้ใช้และรหัสผ่าน';this.render();return;}
+            const user=this.auth.login(u,p);
+            if(user){this.state.loginError='';this.render();}
+            else{this.state.loginError='ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';this.render();}
+        };
+        document.getElementById('login-btn')?.addEventListener('click',doLogin);
+        document.getElementById('login-password')?.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+    }
+
+    // ==================== BIND EVENTS ====================
+    bindEvents() {
+        // Nav
+        document.querySelectorAll('[data-view]').forEach(el=>el.addEventListener('click',e=>{this.state.currentView=e.currentTarget.dataset.view;this.render();}));
+        document.querySelectorAll('.category-btn').forEach(el=>el.addEventListener('click',e=>{this.state.selectedCategory=e.currentTarget.dataset.category;this.render();}));
+        document.querySelectorAll('.product-card').forEach(el=>el.addEventListener('click',e=>{
+            if(e.target.closest('.img-upload-btn'))return;
+            const p=this.products.find(p=>p.id===parseInt(e.currentTarget.dataset.productId));if(p)this.addToCart(p);
+        }));
+        // Image upload buttons
+        document.querySelectorAll('.img-upload-btn').forEach(el=>el.addEventListener('click',e=>{
+            e.stopPropagation();
+            const pid=parseInt(e.currentTarget.dataset.imgProduct);
+            const p=this.products.find(x=>x.id===pid);
+            if(p){this.state.imageProduct=p;this.state.showImageMgmt=true;this.render();}
+        }));
+        // Cart
+        document.querySelectorAll('[data-inc]').forEach(el=>el.addEventListener('click',e=>{e.stopPropagation();this.updateQuantity(parseInt(e.target.dataset.inc),1);}));
+        document.querySelectorAll('[data-dec]').forEach(el=>el.addEventListener('click',e=>{e.stopPropagation();this.updateQuantity(parseInt(e.target.dataset.dec),-1);}));
+        document.querySelectorAll('[data-remove]').forEach(el=>el.addEventListener('click',e=>{e.stopPropagation();this.removeFromCart(parseInt(e.target.dataset.remove));}));
+        document.querySelectorAll('[data-addshot]').forEach(el=>el.addEventListener('click',e=>{e.stopPropagation();this.addShotToCartItem(parseInt(e.target.dataset.addshot));}));
+        const cl=document.querySelector('.clear-cart');if(cl)cl.addEventListener('click',()=>this.clearCart());
+        const co=document.querySelector('.checkout-btn');if(co)co.addEventListener('click',()=>this.checkout());
+        // Receipt
+        const cr=document.querySelector('.close-receipt-btn');if(cr)cr.addEventListener('click',()=>this.closeReceipt());
+        // Sweetness
+        const cs=document.querySelector('.cancel-sweetness');if(cs)cs.addEventListener('click',()=>{this.state.showSweetness=false;this.state.sweetnessProduct=null;this.render();});
+        document.querySelectorAll('[data-sweet-select]').forEach(b=>b.addEventListener('click',e=>{this.addToCartWithSweetness(this.state.sweetnessProduct,parseInt(e.currentTarget.dataset.sweetSelect));}));
+        // Sidebar buttons
+        const stb=document.querySelector('.settings-btn');if(stb)stb.addEventListener('click',()=>{this.state.showSettings=true;this.state.settingsTab='sheets';this.render();});
+        const sub=document.querySelector('.supabase-btn');if(sub)sub.addEventListener('click',()=>{this.state.showSettings=true;this.state.settingsTab='supabase';this.render();});
+        const demo=document.querySelector('.demo-btn');if(demo)demo.addEventListener('click',()=>{this.state.showDemoGenerator=true;this.render();});
+        const ca=document.querySelector('.clear-all-btn');if(ca)ca.addEventListener('click',()=>this.clearAllData());
+        const um=document.querySelector('.user-mgmt-btn');if(um)um.addEventListener('click',()=>{this.state.showUserMgmt=true;this.render();});
+        const lo=document.querySelector('.logout-btn');if(lo)lo.addEventListener('click',()=>{this.auth.logout();this.state.loginError='';this.render();});
+        // Settings modal tabs
+        document.querySelectorAll('[data-settings-tab]').forEach(el=>el.addEventListener('click',e=>{this.state.settingsTab=e.currentTarget.dataset.settingsTab;this.render();}));
+        document.querySelectorAll('.close-settings').forEach(b=>b.addEventListener('click',()=>{this.state.showSettings=false;this.render();}));
+        const sv=document.querySelector('.save-settings');if(sv)sv.addEventListener('click',()=>{
+            const u=document.getElementById('google-sheet-url').value;this.state.googleSheetUrl=u;localStorage.setItem('googleSheetUrl',u);
+            const ae=document.getElementById('auto-export-toggle');if(ae){this.state.autoExportSheets=ae.checked;localStorage.setItem('autoExportSheets',ae.checked);}
+            this.state.showSettings=false;alert(`✅ บันทึกเรียบร้อย!`);this.render();
+        });
+        const ae=document.getElementById('auto-export-toggle');if(ae)ae.addEventListener('change',e=>{this.state.autoExportSheets=e.target.checked;localStorage.setItem('autoExportSheets',e.target.checked);});
+        const tb=document.querySelector('.test-sheets-btn');if(tb)tb.addEventListener('click',async()=>{if(!this.state.googleSheetUrl){alert('⚠️ ใส่ URL ก่อน');return;}try{const now=new Date();await fetch(this.state.googleSheetUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:[{date:now.toLocaleDateString('th-TH'),time:now.toLocaleTimeString('th-TH'),category:'TEST',item:'🧪 ทดสอบ',quantity:1,price:0,cost:0,subtotal:'0',discount:'0',vat:'0',total:'0',profit:'0',staff:'test'}],month:'test'})});alert('✅ ส่งสำเร็จ! เปิด Google Sheet ตรวจสอบ');}catch(e){alert('❌ '+e.message);}});
+        const ssv=document.querySelector('.save-supabase');if(ssv)ssv.addEventListener('click',()=>{this.state.supabaseUrl=document.getElementById('supabase-url').value;this.state.supabaseKey=document.getElementById('supabase-key').value;localStorage.setItem('supabaseUrl',this.state.supabaseUrl);localStorage.setItem('supabaseKey',this.state.supabaseKey);this.state.showSettings=false;alert('☁️ บันทึก Supabase เรียบร้อย!');this.render();});
+        // User management
+        const cum=document.querySelector('.close-user-mgmt');if(cum)cum.addEventListener('click',()=>{this.state.showUserMgmt=false;this.state.showAddUser=false;this.render();});
+        const aub=document.querySelector('.add-user-btn');if(aub)aub.addEventListener('click',()=>{this.state.showAddUser=true;this.render();});
+        const cau=document.querySelector('.cancel-add-user');if(cau)cau.addEventListener('click',()=>{this.state.showAddUser=false;this.render();});
+        const cfu=document.querySelector('.confirm-add-user');if(cfu)cfu.addEventListener('click',()=>{
+            const un=document.getElementById('new-username')?.value?.trim();const pw=document.getElementById('new-password')?.value?.trim();const nm=document.getElementById('new-name')?.value?.trim();const rl=document.getElementById('new-role')?.value;
+            if(!un||!pw||!nm){alert('⚠️ กรุณากรอกข้อมูลให้ครบ');return;}
+            if(this.auth.users.find(u=>u.username===un)){alert('⚠️ มี Username นี้แล้ว');return;}
+            this.auth.addUser({username:un,password:pw,name:nm,role:rl,active:true});this.state.showAddUser=false;this.render();
+        });
+        document.querySelectorAll('.delete-user-btn').forEach(el=>el.addEventListener('click',e=>{const uid=parseInt(e.currentTarget.dataset.deleteUser);if(confirm('ยืนยันลบผู้ใช้นี้?')){this.auth.deleteUser(uid);this.render();}}));
+        // Image management
+        const cim=document.querySelector('.close-image-mgmt');if(cim)cim.addEventListener('click',()=>{this.state.showImageMgmt=false;this.state.imageProduct=null;this.render();});
+        const pib=document.querySelector('.pick-img-btn');if(pib)pib.addEventListener('click',()=>document.getElementById('img-file-input')?.click());
+        const dz=document.getElementById('img-drop-zone');if(dz)dz.addEventListener('click',()=>document.getElementById('img-file-input')?.click());
+        const fi=document.getElementById('img-file-input');if(fi)fi.addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;if(f.size>2*1024*1024){alert('⚠️ ไฟล์ใหญ่เกิน 2MB');return;}const r=new FileReader();r.onload=ev=>{this.setProductImage(this.state.imageProduct.id,ev.target.result);this.state.showImageMgmt=false;this.state.imageProduct=null;this.render();};r.readAsDataURL(f);});
+        const rib=document.querySelector('.remove-img-btn');if(rib)rib.addEventListener('click',()=>{if(confirm('ลบรูปภาพนี้?')){this.removeProductImage(this.state.imageProduct.id);this.state.showImageMgmt=false;this.state.imageProduct=null;this.render();}});
+        // Reports
+        document.querySelectorAll('[data-tab]').forEach(el=>el.addEventListener('click',e=>{this.state.reportTab=e.currentTarget.dataset.tab;this.render();}));
+        const mf=document.getElementById('month-filter');if(mf)mf.addEventListener('change',e=>{this.state.selectedMonth=e.target.value;this.render();});
+        // Dashboard
+        document.querySelectorAll('[data-dash-sub]').forEach(el=>el.addEventListener('click',e=>{this.state.dashSubTab=e.currentTarget.dataset.dashSub;this.render();}));
+        document.querySelectorAll('[data-dash-period]').forEach(el=>el.addEventListener('click',e=>{this.state.dashPeriod=e.currentTarget.dataset.dashPeriod;this.render();}));
+        const dd=document.getElementById('dash-date');if(dd)dd.addEventListener('change',e=>{this.state.dashDate=e.target.value;this.render();});
+        const dw=document.getElementById('dash-week');if(dw)dw.addEventListener('change',e=>{this.state.dashWeekOffset=parseInt(e.target.value);this.render();});
+        const dm=document.getElementById('dash-month');if(dm)dm.addEventListener('change',e=>{this.state.dashMonthKey=e.target.value;this.render();});
+        const dy=document.getElementById('dash-year');if(dy)dy.addEventListener('change',e=>{this.state.dashYear=e.target.value;this.render();});
+        const dc=document.getElementById('dash-compare');if(dc)dc.addEventListener('change',e=>{this.state.dashCompare=e.target.checked;this.render();});
+        document.querySelectorAll('.dash-nav').forEach(el=>el.addEventListener('click',e=>{const nav=e.currentTarget.dataset.dashNav;if(nav==='prev-day'){const d=new Date(this.state.dashDate);d.setDate(d.getDate()-1);this.state.dashDate=d.toISOString().split('T')[0];}if(nav==='next-day'){const d=new Date(this.state.dashDate);d.setDate(d.getDate()+1);this.state.dashDate=d.toISOString().split('T')[0];}if(nav==='today')this.state.dashDate=new Date().toISOString().split('T')[0];this.render();}));
+        document.querySelectorAll('[data-dtop-cat]').forEach(el=>el.addEventListener('click',e=>{this.state.dashTopCat=e.currentTarget.dataset.dtopCat;this.render();}));
+        document.querySelectorAll('[data-line-mode]').forEach(el=>el.addEventListener('click',e=>{this._pbiLineMode=e.currentTarget.dataset.lineMode;e.currentTarget.parentElement.querySelectorAll('.pbi-abtn').forEach(b=>b.classList.remove('active'));e.currentTarget.classList.add('active');this.initDashboardCharts();}));
+        document.querySelectorAll('[data-donut-mode]').forEach(el=>el.addEventListener('click',e=>{this._pbiDonutMode=e.currentTarget.dataset.donutMode;e.currentTarget.parentElement.querySelectorAll('.pbi-abtn').forEach(b=>b.classList.remove('active'));e.currentTarget.classList.add('active');this.initDashboardCharts();}));
+        // Export
+        document.querySelectorAll('[data-export-period]').forEach(el=>el.addEventListener('click',e=>{this.state.exportPeriod=e.currentTarget.dataset.exportPeriod;this.render();}));
+        const ed=document.getElementById('export-date');if(ed)ed.addEventListener('change',e=>{this.state.exportDate=e.target.value;this.render();});
+        const ew=document.getElementById('export-week');if(ew)ew.addEventListener('change',e=>{this.state.exportWeek=e.target.value;this.render();});
+        const em=document.getElementById('export-month');if(em)em.addEventListener('change',e=>{this.state.exportMonth=e.target.value;this.render();});
+        const ey=document.getElementById('export-year');if(ey)ey.addEventListener('change',e=>{this.state.exportYear=e.target.value;this.render();});
+        document.querySelectorAll('.date-nav-btn').forEach(el=>el.addEventListener('click',e=>{const nav=e.currentTarget.dataset.dateNav;const d=new Date(this.state.exportDate+'T00:00:00');if(nav==='prev')d.setDate(d.getDate()-1);else if(nav==='next')d.setDate(d.getDate()+1);else d.setTime(new Date().getTime());this.state.exportDate=d.toISOString().split('T')[0];this.render();}));
+        const epc=document.querySelector('.export-period-csv');if(epc)epc.addEventListener('click',()=>this.exportPeriodCSV());
+        const eps=document.querySelector('.export-period-sheets');if(eps)eps.addEventListener('click',()=>this.exportPeriodSheets());
+        // Demo modal
+        document.querySelectorAll('.close-demo').forEach(b=>b.addEventListener('click',()=>{this.state.showDemoGenerator=false;this.render();}));
+        document.querySelectorAll('[data-demo-months]').forEach(el=>el.addEventListener('click',e=>{this.state.demoMonths=parseInt(e.currentTarget.dataset.demoMonths);this.render();}));
+        document.querySelectorAll('[data-demo-orders]').forEach(el=>el.addEventListener('click',e=>{this.state.demoOrdersPerDay=e.currentTarget.dataset.demoOrders;this.render();}));
+        const dp=document.getElementById('demo-peak');if(dp)dp.addEventListener('change',e=>{this.state.demoPeakHour=e.target.checked;this.render();});
+        const gb=document.querySelector('.generate-demo-btn');if(gb)gb.addEventListener('click',()=>this.generateDemoData());
+    }
+}
+
+const app = new POSApp();
+app.render();
+</script>
+</body>
+</html>
