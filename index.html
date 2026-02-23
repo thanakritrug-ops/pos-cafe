@@ -311,6 +311,22 @@ class POSApp {
     }
 
     getProductImage(productId) { return this.productImages[productId] || null; }
+    // Compress image before storing
+    compressImage(dataUrl, maxWidth=400, quality=0.6) {
+        return new Promise(resolve => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let w = img.width, h = img.height;
+                if (w > maxWidth) { h = Math.round(h * maxWidth / w); w = maxWidth; }
+                canvas.width = w; canvas.height = h;
+                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                resolve(canvas.toDataURL('image/jpeg', quality));
+            };
+            img.src = dataUrl;
+        });
+    }
+
     setProductImage(productId, dataUrl) {
         this.productImages[productId] = dataUrl;
         try { localStorage.setItem('pos_product_images', JSON.stringify(this.productImages)); } catch(e) { alert('⚠️ หน่วยความจำเต็ม ไม่สามารถบันทึกรูปภาพได้'); }
@@ -1068,7 +1084,7 @@ class POSApp {
             logoZone.addEventListener('dragover', e => { e.preventDefault(); logoZone.style.borderColor='#00BFA5'; });
             logoZone.addEventListener('dragleave', () => logoZone.style.borderColor='');
             logoZone.addEventListener('drop', e => { e.preventDefault(); const file=e.dataTransfer.files[0]; if(file) this.handleLogoFile(file); });
-            logoInput.addEventListener('change', e => { if(e.target.files[0]) this.handleLogoFile(e.target.files[0]); });
+            logoInput.addEventListener('change', async e => { if(e.target.files[0]) { const f=e.target.files[0]; const r=new FileReader(); r.onload=async ev=>{const compressed=await this.compressImage(ev.target.result,300,0.7); this._pendingLogo=compressed; const zone=document.getElementById('logo-drop-zone'); if(zone)zone.innerHTML=`<img src="${compressed}" style="max-height:120px;max-width:100%;border-radius:12px;margin:auto">`;}; r.readAsDataURL(f); } });
         }
         const saveLogoBtn = document.getElementById('save-logo-btn');
         if (saveLogoBtn) saveLogoBtn.addEventListener('click', () => {
@@ -1108,7 +1124,7 @@ class POSApp {
         const cim=document.querySelector('.close-image-mgmt');if(cim)cim.addEventListener('click',()=>{this.state.showImageMgmt=false;this.state.imageProduct=null;this.render();});
         const pib=document.querySelector('.pick-img-btn');if(pib)pib.addEventListener('click',()=>document.getElementById('img-file-input')?.click());
         const dz=document.getElementById('img-drop-zone');if(dz)dz.addEventListener('click',()=>document.getElementById('img-file-input')?.click());
-        const fi=document.getElementById('img-file-input');if(fi)fi.addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;if(f.size>2*1024*1024){alert('⚠️ ไฟล์ใหญ่เกิน 2MB');return;}const r=new FileReader();r.onload=ev=>{this.setProductImage(this.state.imageProduct.id,ev.target.result);this.state.showImageMgmt=false;this.state.imageProduct=null;this.render();};r.readAsDataURL(f);});
+        const fi=document.getElementById('img-file-input');if(fi)fi.addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;if(f.size>10*1024*1024){alert('⚠️ ไฟล์ใหญ่เกิน 10MB');return;}const r=new FileReader();r.onload=async ev=>{const compressed=await this.compressImage(ev.target.result);this.setProductImage(this.state.imageProduct.id,compressed);this.state.showImageMgmt=false;this.state.imageProduct=null;this.render();};r.readAsDataURL(f);});
         const rib=document.querySelector('.remove-img-btn');if(rib)rib.addEventListener('click',()=>{if(confirm('ลบรูปภาพนี้?')){this.removeProductImage(this.state.imageProduct.id);this.state.showImageMgmt=false;this.state.imageProduct=null;this.render();}});
         // Reports
         document.querySelectorAll('[data-tab]').forEach(el=>el.addEventListener('click',e=>{this.state.reportTab=e.currentTarget.dataset.tab;this.render();}));
