@@ -1008,12 +1008,28 @@ class POSApp {
         if(this.state.currentView!=='reports'||this.state.reportTab!=='dashboard')return;
         if(!document.getElementById('pbiLineChart'))return;
         const allOrders=this.getFilteredOrders();if(!allOrders.length)return;
-        const {orders}=this.getDashFilteredOrders(allOrders);
+        const {orders,prevOrders,periodLabel,prevLabel}=this.getDashFilteredOrders(allOrders);
         const agg=this.aggregateDashboardData(orders);
+        const prevAgg=prevOrders&&prevOrders.length?this.aggregateDashboardData(prevOrders):null;
         if(this._pbiCharts){Object.values(this._pbiCharts).forEach(c=>{try{c.destroy();}catch(e){}});} this._pbiCharts={};
         const mode=this._pbiLineMode||'rev';
         const lineEl=document.getElementById('pbiLineChart');
-        if(lineEl){const ctx=lineEl.getContext('2d');const labels=agg.daily.map(d=>new Date(d.date+'T12:00:00').toLocaleDateString('th-TH',{day:'numeric',month:'short'}));const data=agg.daily.map(d=>mode==='profit'?d.profit:mode==='orders'?d.orders:d.rev);this._pbiCharts.line=new Chart(ctx,{type:'line',data:{labels,datasets:[{label:mode==='profit'?'กำไร':mode==='orders'?'ออเดอร์':'ยอดขาย',data,borderColor:'#0078d4',backgroundColor:'#0078d410',fill:true,tension:.3,pointRadius:2,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`฿${Math.round(c.parsed.y).toLocaleString()}`}}},scales:{x:{ticks:{font:{size:9},maxTicksLimit:10},grid:{display:false}},y:{ticks:{font:{size:9},callback:v=>'฿'+Math.round(v).toLocaleString()},grid:{color:'#F0FDFA'}}}}});}
+        if(lineEl){
+            const ctx=lineEl.getContext('2d');
+            const labels=agg.daily.map(d=>new Date(d.date+'T12:00:00').toLocaleDateString('th-TH',{day:'numeric',month:'short'}));
+            const data=agg.daily.map(d=>mode==='profit'?d.profit:mode==='orders'?d.orders:d.rev);
+            const datasets=[{label:(periodLabel||'ช่วงหลัก')+(mode==='profit'?' (กำไร)':mode==='orders'?' (ออเดอร์)':' (ยอดขาย)'),data,borderColor:'#0078d4',backgroundColor:'#0078d410',fill:true,tension:.3,pointRadius:2,borderWidth:2}];
+            if(prevAgg&&prevAgg.daily.length){
+                // Map prev data by index (day position) to overlay on same x-axis
+                const prevData=prevAgg.daily.map(d=>mode==='profit'?d.profit:mode==='orders'?d.orders:d.rev);
+                // Pad or trim to match main data length
+                const aligned=Array(data.length).fill(null);
+                prevData.forEach((v,i)=>{if(i<data.length)aligned[i]=v;});
+                datasets.push({label:(prevLabel||'ช่วงเปรียบเทียบ')+(mode==='profit'?' (กำไร)':mode==='orders'?' (ออเดอร์)':' (ยอดขาย)'),data:aligned,borderColor:'#f2a500',backgroundColor:'#f2a50010',fill:false,tension:.3,pointRadius:2,borderWidth:2,borderDash:[5,3]});
+            }
+            const showLegend=datasets.length>1;
+            this._pbiCharts.line=new Chart(ctx,{type:'line',data:{labels,datasets},options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:showLegend,labels:{font:{size:9},boxWidth:12}},tooltip:{callbacks:{label:c=>c.dataset.label+': ฿'+Math.round(c.parsed.y).toLocaleString()}}},scales:{x:{ticks:{font:{size:9},maxTicksLimit:10},grid:{display:false}},y:{ticks:{font:{size:9},callback:v=>'฿'+Math.round(v).toLocaleString()},grid:{color:'#F0FDFA'}}}}});
+        }
         const donutEl=document.getElementById('pbiDonutChart');
         if(donutEl){const ctx=donutEl.getContext('2d');const cats=Object.values(agg.catMap);const mode2=this._pbiDonutMode||'rev';this._pbiCharts.donut=new Chart(ctx,{type:'doughnut',data:{labels:cats.map(c=>c.name),datasets:[{data:cats.map(c=>mode2==='qty'?c.qty:c.rev),backgroundColor:cats.map(c=>c.color),borderWidth:2,borderColor:'white'}]},options:{responsive:false,plugins:{legend:{display:false}}}});}
         const barEl=document.getElementById('pbiBarChart');
