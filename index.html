@@ -8,6 +8,81 @@
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+    <script>
+    // ==================== INLINE SERVICE WORKER ====================
+    (function() {
+        if (!('serviceWorker' in navigator)) return;
+
+        const CACHE = 'pos-cafe-v1';
+        const URLS = [
+            'https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap',
+            'https://fonts.gstatic.com',
+            'https://cdn.tailwindcss.com',
+            'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js',
+        ];
+
+        const swCode = `
+const CACHE_NAME = '${CACHE}';
+const PRECACHE = ${JSON.stringify(URLS)};
+
+self.addEventListener('install', e => {
+    e.waitUntil(
+        caches.open(CACHE_NAME).then(cache => {
+            return Promise.allSettled(PRECACHE.map(url => cache.add(url).catch(() => {})));
+        }).then(() => self.skipWaiting())
+    );
+});
+
+self.addEventListener('activate', e => {
+    e.waitUntil(
+        caches.keys().then(keys =>
+            Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+        ).then(() => self.clients.claim())
+    );
+});
+
+self.addEventListener('fetch', e => {
+    if (e.request.method !== 'GET') return;
+    const url = e.request.url;
+    // Only intercept CDN / font requests — let local requests pass through normally
+    const isCDN = url.includes('cdn.tailwindcss') || url.includes('cdnjs.cloudflare') ||
+                  url.includes('fonts.googleapis') || url.includes('fonts.gstatic');
+    if (!isCDN) return;
+
+    e.respondWith(
+        caches.match(e.request).then(cached => {
+            if (cached) return cached;
+            return fetch(e.request).then(res => {
+                if (res && res.status === 200) {
+                    const clone = res.clone();
+                    caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
+                }
+                return res;
+            }).catch(() => cached || new Response('', { status: 503 }));
+        })
+    );
+});
+`;
+
+        const blob = new Blob([swCode], { type: 'application/javascript' });
+        const swUrl = URL.createObjectURL(blob);
+
+        navigator.serviceWorker.register(swUrl, { scope: '/' })
+            .then(reg => {
+                console.log('[POS SW] ลงทะเบียน Service Worker สำเร็จ — ใช้ออฟไลน์ได้หลังโหลดครั้งแรก');
+                reg.addEventListener('updatefound', () => {
+                    const w = reg.installing;
+                    w.addEventListener('statechange', () => {
+                        if (w.state === 'installed' && navigator.serviceWorker.controller) {
+                            console.log('[POS SW] อัปเดต cache เรียบร้อย');
+                        }
+                    });
+                });
+            })
+            .catch(err => console.warn('[POS SW] Service Worker ไม่ทำงาน:', err));
+    })();
+    </script>
     <script>
     tailwind.config = {
         theme: { extend: { colors: {
@@ -166,14 +241,12 @@ class POSApp {
     constructor() {
         this.auth = new AuthManager();
         this.state = {
-            selectedCategory:'coffee', cart:[], discount:10, currentView:'pos',
+            selectedCategory:'coffee', cart:[], currentView:'pos',
             orders:[], showSettings:false, showSweetness:false, sweetnessProduct:null,
             selectedMonth:'all', reportTab:'dashboard', topCategory:'all', dashSubTab:'overview',
             dashPeriod:'all', dashDate:new Date().toISOString().split('T')[0], dashWeekOffset:0,
             dashMonthKey:`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`,
             dashYear:String(new Date().getFullYear()), dashCompare:false,
-            dashDate2: new Date(Date.now()-7*86400000).toISOString().split('T')[0],
-            dashWeekOffset2: 1, dashMonthKey2: '', dashYear2: String(new Date().getFullYear()-1),
             dashDate2:(()=>{const d=new Date();d.setDate(d.getDate()-1);return d.toISOString().split('T')[0];})(),
             dashWeekOffset2:1,
             dashMonthKey2:(()=>{const d=new Date();d.setMonth(d.getMonth()-1);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;})(),
@@ -189,9 +262,20 @@ class POSApp {
             showDemoGenerator:false, demoMonths:3, demoOrdersPerDay:'15-30', demoPeakHour:true,
             // New
             showReceipt:false, lastOrder:null, loginError:'',
-            showUserMgmt:false, showAddUser:false, editUserId:null,
+            showUserMgmt:false, showAddUser:false, editUserId:null, editUserData:null,
             showImageMgmt:false, imageProduct:null,
+            showProductMgmt:false, editProductId:null, editProductData:null, showAddProduct:false,
+            paymentMethod:'cash',
             settingsOpen:false,
+            discount:0,
+            showTodayHistory:false,
+            historyDate:new Date().toISOString().split('T')[0],
+            historyFilterMode:'today',
+            showEditOrder:false,
+            editOrderId:null,
+            editOrderItems:[],
+            editOrderDiscount:0,
+            editOrderPayment:'cash',
         };
 
         let id=1;
@@ -292,6 +376,9 @@ class POSApp {
         this.sweetnessLevels = [{value:0,label:'0%'},{value:25,label:'25%'},{value:50,label:'50%'},{value:75,label:'75%'},{value:100,label:'100%'}];
         // Load product images from localStorage
         this.productImages = JSON.parse(localStorage.getItem('pos_product_images')) || {};
+        // Load custom products
+        const savedProducts = JSON.parse(localStorage.getItem('pos_products_custom'));
+        if (savedProducts && savedProducts.length > 0) this.products = savedProducts;
         // Load logo
         this.shopLogo = localStorage.getItem('pos_shop_logo') || null;
         this.shopName = localStorage.getItem('pos_shop_name') || 'POS Café Pro';
@@ -376,7 +463,7 @@ class POSApp {
         };
         req.onerror=()=>{try{const s=localStorage.getItem('pos_orders');this.state.orders=s?JSON.parse(s):[];}catch(e){this.state.orders=[];}this.render();};
     }
-    _slimOrder(o) { return {id:o.id,timestamp:o.timestamp,items:o.items.map(i=>{const s={name:i.name,price:i.price,cost:i.cost,quantity:i.quantity,category:i.category};if(i.originalName)s.originalName=i.originalName;if(i.sweetness!==undefined)s.sweetness=i.sweetness;if(i.extraShots)s.extraShots=i.extraShots;if(i.isDrink)s.isDrink=true;return s;}),subtotal:o.subtotal,totalCost:o.totalCost,discount:o.discount,vat:o.vat,total:o.total,profit:o.profit,staffId:o.staffId,staffName:o.staffName}; }
+    _slimOrder(o) { return {id:o.id,timestamp:o.timestamp,items:o.items.map(i=>{const s={name:i.name,price:i.price,cost:i.cost,quantity:i.quantity,category:i.category};if(i.originalName)s.originalName=i.originalName;if(i.sweetness!==undefined)s.sweetness=i.sweetness;if(i.extraShots)s.extraShots=i.extraShots;if(i.isDrink)s.isDrink=true;return s;}),subtotal:o.subtotal,totalCost:o.totalCost,discount:o.discount,vat:o.vat,total:o.total,profit:o.profit,staffId:o.staffId||'',staffName:o.staffName||'',paymentMethod:o.paymentMethod||'cash'}; }
     saveOrders() {
         if(this._dbReady&&this._db){try{const tx=this._db.transaction('orders','readwrite');tx.objectStore('orders').put(this._slimOrder(this.state.orders[0]));}catch(e){}}
         else{try{localStorage.setItem('pos_orders',JSON.stringify(this.state.orders.map(o=>this._slimOrder(o))));}catch(e){alert('⚠️ พื้นที่เก็บข้อมูลเต็ม กรุณา Export ก่อน');}}
@@ -421,7 +508,7 @@ class POSApp {
         const tc=this.state.cart.reduce((s,i)=>s+i.cost*i.quantity,0);
         const disc=(sub*this.state.discount)/100;
         const vat=(sub-disc)*0.07; const tot=sub-disc+vat; const prof=tot-tc;
-        const order={id:Date.now(),timestamp:new Date().toISOString(),items:[...this.state.cart],subtotal:sub,totalCost:tc,discount:disc,vat,total:tot,profit:prof,staffId:this.auth.currentUser?.id,staffName:this.auth.currentUser?.name||''};
+        const order={id:Date.now(),timestamp:new Date().toISOString(),items:[...this.state.cart],subtotal:sub,totalCost:tc,discount:disc,vat,total:tot,profit:prof,staffId:this.auth.currentUser?.id,staffName:this.auth.currentUser?.name||'',paymentMethod:this.state.paymentMethod||'cash'};
         this.state.orders.unshift(order);
         this.saveOrders();
         // Supabase sync
@@ -446,7 +533,7 @@ class POSApp {
     getExportOrders(){const p=this.state.exportPeriod;return this.state.orders.filter(o=>{const d=new Date(o.timestamp);if(p==='day')return d.toISOString().split('T')[0]===this.state.exportDate;if(p==='week'){const{start,end}=this.getWeekRange(this.state.exportWeek);start.setHours(0,0,0,0);end.setHours(23,59,59,999);return d>=start&&d<=end;}if(p==='month')return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`===this.state.exportMonth;if(p==='year')return String(d.getFullYear())===this.state.exportYear;return true;});}
     getExportLabel(){const p=this.state.exportPeriod;if(p==='day'){const d=new Date(this.state.exportDate+'T00:00:00');return`วันที่ ${d.toLocaleDateString('th-TH',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}`;}if(p==='week')return`สัปดาห์ ${this.getWeekLabel(this.state.exportWeek)}`;if(p==='month')return this.getMonthNameFull(this.state.exportMonth);if(p==='year')return`ปี ${parseInt(this.state.exportYear)+543}`;return'';}
     calcExportStats(orders){const revenue=orders.reduce((s,o)=>s+o.total,0),cost=orders.reduce((s,o)=>s+o.totalCost,0),profit=orders.reduce((s,o)=>s+o.profit,0),items=orders.reduce((s,o)=>s+o.items.reduce((ss,i)=>ss+i.quantity,0),0),margin=revenue>0?(profit/revenue*100):0;const productMap={},catMap={};orders.forEach(o=>o.items.forEach(item=>{const k=item.originalName||item.name;if(!productMap[k])productMap[k]={name:k,category:item.category,qty:0,revenue:0,profit:0};productMap[k].qty+=item.quantity;productMap[k].revenue+=item.price*item.quantity;productMap[k].profit+=(item.price-item.cost)*item.quantity;if(!catMap[item.category])catMap[item.category]={qty:0,revenue:0,profit:0};catMap[item.category].qty+=item.quantity;catMap[item.category].revenue+=item.price*item.quantity;catMap[item.category].profit+=(item.price-item.cost)*item.quantity;}));const topProducts=Object.values(productMap).sort((a,b)=>b.qty-a.qty).slice(0,10);return{revenue,cost,profit,items,margin,orderCount:orders.length,topProducts,catMap};}
-    exportPeriodCSV(){const orders=this.getExportOrders();if(!orders.length){alert('❌ ไม่มีข้อมูลในช่วงที่เลือก');return;}const label=this.getExportLabel();const headers=['วันที่','เวลา','หมวดหมู่','รายการ','จำนวน','ราคา','ต้นทุน','ยอดรวม','ส่วนลด','VAT','สุทธิ','กำไร','พนักงาน'];const rows=orders.flatMap(o=>{const d=new Date(o.timestamp);return o.items.map(item=>[d.toLocaleDateString('th-TH'),d.toLocaleTimeString('th-TH'),this.getCategoryName(item.category),item.name,item.quantity,item.price,item.cost,o.subtotal.toFixed(2),o.discount.toFixed(2),o.vat.toFixed(2),o.total.toFixed(2),o.profit.toFixed(2),o.staffName||'']);});const csv=[headers.join(','),...rows.map(r=>r.join(','))].join('\n');const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8;'});const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download=`POS_${this.state.exportPeriod}_${this.state.exportDate||this.state.exportWeek||this.state.exportMonth||this.state.exportYear}.csv`;link.click();alert(`✅ Export CSV สำเร็จ!\n${label}\n${orders.length} รายการ`);}
+    exportPeriodCSV(){const orders=this.getExportOrders();if(!orders.length){alert('❌ ไม่มีข้อมูลในช่วงที่เลือก');return;}const label=this.getExportLabel();const headers=['วันที่','เวลา','หมวดหมู่','รายการ','จำนวน','ราคา','ต้นทุน','ยอดรวม','ส่วนลด','VAT','สุทธิ','กำไร','พนักงาน','ช่องทางชำระ'];const rows=orders.flatMap(o=>{const d=new Date(o.timestamp);const pm={cash:'เงินสด',transfer:'โอนเงิน',card:'บัตร'}[o.paymentMethod||'cash']||'เงินสด';return o.items.map(item=>[d.toLocaleDateString('th-TH'),d.toLocaleTimeString('th-TH'),this.getCategoryName(item.category),item.name,item.quantity,item.price,item.cost,o.subtotal.toFixed(2),o.discount.toFixed(2),o.vat.toFixed(2),o.total.toFixed(2),o.profit.toFixed(2),o.staffName||'',pm]);});const csv=[headers.join(','),...rows.map(r=>r.join(','))].join('\n');const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8;'});const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download=`POS_${this.state.exportPeriod}_${this.state.exportDate||this.state.exportWeek||this.state.exportMonth||this.state.exportYear}.csv`;link.click();alert(`✅ Export CSV สำเร็จ!\n${label}\n${orders.length} รายการ`);}
     async exportPeriodSheets(){const orders=this.getExportOrders();if(!orders.length){alert('❌ ไม่มีข้อมูลในช่วงที่เลือก');return;}if(!this.state.googleSheetUrl){this.state.showSettings=true;this.render();return;}try{const data=orders.flatMap(o=>{const d=new Date(o.timestamp);return o.items.map(item=>({date:d.toLocaleDateString('th-TH'),time:d.toLocaleTimeString('th-TH'),category:this.getCategoryName(item.category),item:item.name,quantity:item.quantity,price:item.price,cost:item.cost,subtotal:o.subtotal.toFixed(2),discount:o.discount.toFixed(2),vat:o.vat.toFixed(2),total:o.total.toFixed(2),profit:o.profit.toFixed(2),staff:o.staffName||''}));});const mk=this.state.exportPeriod==='year'?this.state.exportYear:this.state.exportPeriod==='month'?this.state.exportMonth:this.state.exportPeriod==='week'?this.state.exportWeek:this.state.exportDate;await fetch(this.state.googleSheetUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify({data,month:mk})});alert(`✅ ส่งไป Google Drive สำเร็จ!\n📋 Tab: ${mk}`);}catch(e){alert('❌ '+e.message);}}
     getProductAnalytics(){const fo=this.getFilteredOrders();const m={};fo.forEach(o=>o.items.forEach(item=>{const k=item.originalName||item.name;if(!m[k])m[k]={name:k,category:item.category,quantity:0,revenue:0,cost:0,profit:0,basePrice:item.price,baseCost:item.cost,orders:new Set()};m[k].quantity+=item.quantity;m[k].revenue+=item.price*item.quantity;m[k].cost+=item.cost*item.quantity;m[k].profit+=(item.price-item.cost)*item.quantity;m[k].orders.add(o.id);}));return Object.values(m).map(p=>({...p,profitPerUnit:p.quantity>0?p.profit/p.quantity:0,profitMargin:p.revenue>0?(p.profit/p.revenue)*100:0,orderCount:p.orders.size}));}
     classifyProduct(p,mxQ,mxP){const qr=mxQ>0?p.quantity/mxQ:0,pr=mxP>0?p.profitPerUnit/mxP:0;if(qr>=.3&&pr>=.3)return{label:'⭐ Star',cls:'signal-star'};if(qr>=.3)return{label:'🔄 Volume',cls:'signal-keep'};if(pr>=.3)return{label:'💎 Niche',cls:'signal-warn'};return{label:'⚠️ Review',cls:'signal-drop'};}
@@ -476,6 +563,8 @@ class POSApp {
         if(this.state.showReceipt&&this.state.lastOrder) content+=this.renderReceiptModal(this.state.lastOrder);
         if(this.state.showUserMgmt) content+=this.renderUserMgmtModal();
         if(this.state.showImageMgmt&&this.state.imageProduct) content+=this.renderImageMgmtModal();
+        if(this.state.showProductMgmt) content+=this.renderProductMgmtModal();
+        if(this.state.showTodayHistory) content+=this.renderTodayHistoryModal();
 
         app.innerHTML=content;
         this.bindEvents();
@@ -540,7 +629,7 @@ class POSApp {
             <nav class="flex-1 px-3 space-y-1 overflow-y-auto">
                 <div data-view="pos" class="nav-item ${v==='pos'?'active':''}"><span class="nav-icon">🛒</span>ขายหน้าร้าน</div>
                 ${this.auth.can('reports')?`<div data-view="reports" class="nav-item ${v==='reports'?'active':''}"><span class="nav-icon">📊</span>รายงาน & วิเคราะห์</div>`:''}
-                ${(this.auth.can('settings')||this.auth.can('supabase')||this.auth.can('manage_users')||this.auth.can('demo')||this.auth.can('clear'))?`
+                ${(this.auth.can('settings')||this.auth.can('supabase')||this.auth.can('manage_users')||this.auth.can('manage_products')||this.auth.can('demo')||this.auth.can('clear'))?`
                 <div class="mt-4 mb-1">
                     <button id="settings-toggle" class="w-full flex items-center justify-between px-2 py-1 text-xs font-bold tracking-widest transition" style="color:rgba(255,255,255,.4);letter-spacing:.08em">
                         <span>⚙️ ตั้งค่า</span>
@@ -550,6 +639,7 @@ class POSApp {
                 <div id="settings-menu" style="overflow:hidden;transition:max-height .25s ease;max-height:${this.state.settingsOpen!==false?'300px':'0px'}">
                     ${this.auth.can('settings')?`<div class="settings-btn nav-item"><span class="nav-icon">📊</span>Google Drive ${this.state.autoExportSheets&&this.state.googleSheetUrl?'<span style="color:#00BFA5;margin-left:auto">●</span>':''}</div>`:''}
                     ${this.auth.can('supabase')?`<div class="supabase-btn nav-item"><span class="nav-icon">☁️</span>Supabase Cloud ${this.state.supabaseUrl?'<span style="color:#10b981;margin-left:auto">●</span>':''}</div>`:''}
+                    ${this.auth.can('manage_products')?`<div class="product-mgmt-btn nav-item"><span class="nav-icon">🛍️</span>จัดการสินค้า</div>`:''}
                     ${this.auth.can('manage_users')?`<div class="user-mgmt-btn nav-item"><span class="nav-icon">👥</span>จัดการผู้ใช้</div>`:''}
                     ${this.auth.can('demo')?`<div class="demo-btn nav-item"><span class="nav-icon">🧪</span>สร้างข้อมูลจำลอง</div>`:''}
                     ${this.auth.can('clear')?`<div class="clear-all-btn nav-item" style="color:rgba(255,100,100,.7)"><span class="nav-icon">🗑️</span>ล้างข้อมูลทั้งหมด</div>`:''}
@@ -593,7 +683,6 @@ class POSApp {
         </div>`;
     }
 
-    // ==================== CART ====================
     renderCart(sub,tc,disc,vat,tot) {
         const hasItems = this.state.cart.length > 0;
         const clearBtn = hasItems ? '<button class="clear-cart text-gray-400 hover:text-red-500 text-xl transition">&#x2715;</button>' : '';
@@ -620,23 +709,48 @@ class POSApp {
                     +'</div></div>';
             }).join('') + '</div>';
         }
+        // Discount input row
+        const discRow = `<div class="flex items-center gap-2 mb-2 p-2.5 bg-red-50 rounded-xl border border-red-100">
+            <span class="text-xs text-gray-600 flex-1">🏷️ ส่วนลด (%)</span>
+            <div class="flex items-center gap-1">
+                <button id="disc-dec" class="w-6 h-6 bg-white border border-gray-200 rounded-lg text-xs font-bold hover:bg-gray-100">−</button>
+                <input id="discount-input" type="number" min="0" max="100" value="${this.state.discount}" class="w-14 text-center border-2 border-red-200 rounded-lg text-sm font-bold focus:outline-none focus:border-red-400 py-0.5" style="color:#dc2626">
+                <button id="disc-inc" class="w-6 h-6 bg-white border border-gray-200 rounded-lg text-xs font-bold hover:bg-gray-100">+</button>
+                <span class="text-xs text-gray-500">%</span>
+            </div>
+        </div>`;
+        // Payment method selector
+        const pm = this.state.paymentMethod || 'cash';
+        const payRow = `<div class="mb-3">
+            <div class="text-xs font-bold text-gray-500 mb-1.5">💳 ช่องทางชำระเงิน</div>
+            <div class="grid grid-cols-3 gap-1.5">
+                <button data-pay="cash" class="pay-method-btn py-2 rounded-xl text-xs font-bold border-2 transition ${pm==='cash'?'border-teal-500 bg-teal-50 text-teal-700':'border-gray-200 hover:border-teal-300 text-gray-600'}">💵 เงินสด</button>
+                <button data-pay="transfer" class="pay-method-btn py-2 rounded-xl text-xs font-bold border-2 transition ${pm==='transfer'?'border-blue-500 bg-blue-50 text-blue-700':'border-gray-200 hover:border-blue-300 text-gray-600'}">📱 โอนเงิน</button>
+                <button data-pay="card" class="pay-method-btn py-2 rounded-xl text-xs font-bold border-2 transition ${pm==='card'?'border-purple-500 bg-purple-50 text-purple-700':'border-gray-200 hover:border-purple-300 text-gray-600'}">💳 บัตร</button>
+            </div>
+        </div>`;
         let bottomHtml = '';
         if (hasItems) {
             bottomHtml = '<div class="p-4 border-t border-gray-100">'
+                + discRow
                 +'<div class="space-y-1.5 text-sm mb-3">'
                 +'<div class="flex justify-between text-gray-600"><span>ยอดรวม</span><span>&#x0e3f;'+sub.toFixed(2)+'</span></div>'
-                +'<div class="flex justify-between text-red-500"><span>ส่วนลด ('+this.state.discount+'%)</span><span>-&#x0e3f;'+disc.toFixed(2)+'</span></div>'
+                +(disc>0?'<div class="flex justify-between text-red-500"><span>ส่วนลด ('+this.state.discount+'%)</span><span>-&#x0e3f;'+disc.toFixed(2)+'</span></div>':'')
                 +'<div class="flex justify-between text-gray-600"><span>VAT (7%)</span><span>&#x0e3f;'+vat.toFixed(2)+'</span></div>'
                 +'<div class="flex justify-between text-lg font-bold pt-2 border-t border-gray-100 mt-2"><span>รวมสุทธิ</span><span style="color:#107c10">&#x0e3f;'+tot.toFixed(2)+'</span></div>'
                 +'</div>'
-                +'<button class="checkout-btn w-full py-3.5 text-white rounded-xl font-bold text-lg shadow-md transition" style="background:#00BFA5">ชำระเงิน &#x0e3f;'+tot.toFixed(2)+'</button>'
+                + payRow
+                +'<button class="checkout-btn w-full py-3.5 text-white rounded-xl font-bold text-lg shadow-md transition" style="background:#00BFA5">ชำระเงิน &#x0e3f;'+tot.toFixed(2)+' <span style="font-size:11px;opacity:.7;margin-left:4px">[Enter]</span></button>'
                 +'</div>';
         } else {
             bottomHtml = '<div class="p-4 border-t border-gray-100"><button class="checkout-btn w-full py-3.5 rounded-xl font-bold text-lg bg-gray-100 text-gray-400 cursor-not-allowed">ชำระเงิน</button></div>';
         }
         return '<div class="flex flex-col border-l border-gray-100 bg-white" style="width:360px;flex-shrink:0">'
             +'<div class="p-4 border-b border-gray-100"><div class="flex items-center justify-between">'
-            +'<h2 class="text-lg font-bold text-gray-800">&#x1F6D2; รายการสั่งซื้อ</h2>'+clearBtn+'</div>'+staffBadge+'</div>'
+            +'<h2 class="text-lg font-bold text-gray-800">&#x1F6D2; รายการสั่งซื้อ</h2>'
+            +'<div class="flex items-center gap-2">'
+            +'<button class="today-history-btn text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-teal-50 hover:border-teal-400 hover:text-teal-700 transition flex items-center gap-1">🕐 วันนี้</button>'
+            +clearBtn+'</div></div>'+staffBadge+'</div>'
             +'<div class="flex-1 overflow-y-auto p-3">'+itemsHtml+'</div>'
             +bottomHtml+'</div>';
     }
@@ -679,6 +793,12 @@ class POSApp {
                         <div class="flex justify-between text-red-500"><span>ส่วนลด</span><span>-฿${order.discount.toFixed(2)}</span></div>
                         <div class="flex justify-between text-gray-500"><span>VAT 7%</span><span>฿${order.vat.toFixed(2)}</span></div>
                         <div class="flex justify-between text-lg font-bold pt-2 border-t-2 border-gray-800"><span>รวมสุทธิ</span><span style="color:#107c10">฿${order.total.toFixed(2)}</span></div>
+                    </div>
+                    <div class="mt-3 pt-2 border-t border-dashed border-gray-200">
+                        <div class="flex justify-between items-center text-sm">
+                            <span class="text-gray-500">ช่องทางชำระ</span>
+                            <span class="font-bold px-3 py-1 rounded-full text-xs ${order.paymentMethod==='transfer'?'bg-blue-50 text-blue-700':order.paymentMethod==='card'?'bg-purple-50 text-purple-700':'bg-green-50 text-green-700'}">${order.paymentMethod==='transfer'?'📱 โอนเงิน':order.paymentMethod==='card'?'💳 บัตรเครดิต':'💵 เงินสด'}</span>
+                        </div>
                     </div>
                     <div class="text-center mt-4 pt-3 border-t border-dashed border-gray-200">
                         <div class="text-xs text-gray-400">🙏 ขอบคุณที่มาอุดหนุน</div>
@@ -821,6 +941,8 @@ class POSApp {
         const users=this.auth.users;
         const roleLabel={owner:'เจ้าของ',manager:'ผู้จัดการ',staff:'พนักงาน'};
         const roleCls={owner:'role-owner',manager:'role-manager',staff:'role-staff'};
+        const editId=this.state.editUserId;
+        const editData=this.state.editUserData||{};
         return `<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div class="bg-white rounded-2xl max-w-2xl w-full mx-4" style="max-height:90vh;overflow-y:auto">
                 <div class="flex items-center justify-between p-5 border-b border-gray-100">
@@ -846,6 +968,21 @@ class POSApp {
                         </div>
                     </div>
                     `:''}
+                    ${editId?`
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-5">
+                        <div class="font-bold text-sm mb-3">✏️ แก้ไขผู้ใช้: ${editData.name||''}</div>
+                        <div class="grid grid-cols-2 gap-3 mb-3">
+                            <div><label class="text-xs font-bold mb-1 block">ชื่อที่แสดง</label><input id="edit-name" type="text" value="${editData.name||''}" class="w-full px-3 py-2 border-2 rounded-lg text-sm focus:border-blue-500 focus:outline-none"></div>
+                            <div><label class="text-xs font-bold mb-1 block">รหัสผ่านใหม่ (ว่าง=ไม่เปลี่ยน)</label><input id="edit-password" type="text" placeholder="เว้นว่างถ้าไม่เปลี่ยน" class="w-full px-3 py-2 border-2 rounded-lg text-sm focus:border-blue-500 focus:outline-none"></div>
+                            <div><label class="text-xs font-bold mb-1 block">ชื่อผู้ใช้</label><input id="edit-username" type="text" value="${editData.username||''}" class="w-full px-3 py-2 border-2 rounded-lg text-sm focus:border-blue-500 focus:outline-none"></div>
+                            <div><label class="text-xs font-bold mb-1 block">สิทธิ์</label><select id="edit-role" class="w-full px-3 py-2 border-2 rounded-lg text-sm focus:border-blue-500 focus:outline-none"><option value="staff" ${editData.role==='staff'?'selected':''}>พนักงาน</option><option value="manager" ${editData.role==='manager'?'selected':''}>ผู้จัดการ</option><option value="owner" ${editData.role==='owner'?'selected':''}>เจ้าของ</option></select></div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button class="confirm-edit-user px-4 py-2 text-sm font-bold text-white rounded-lg" style="background:#0078d4">💾 บันทึกการแก้ไข</button>
+                            <button class="cancel-edit-user px-4 py-2 text-sm border-2 border-gray-300 rounded-lg">ยกเลิก</button>
+                        </div>
+                    </div>
+                    `:''}
                     <table class="w-full text-sm">
                         <thead class="bg-gray-50"><tr>
                             <th class="px-4 py-2 text-left">ชื่อ</th><th class="px-4 py-2 text-left">Username</th>
@@ -856,7 +993,10 @@ class POSApp {
                             <td class="px-4 py-3 text-gray-500">${u.username}</td>
                             <td class="px-4 py-3"><span class="role-badge ${roleCls[u.role]||''}">${roleLabel[u.role]||u.role}</span></td>
                             <td class="px-4 py-3 text-center">
-                                ${u.id!==this.auth.currentUser?.id?`<button data-delete-user="${u.id}" class="delete-user-btn text-red-500 hover:text-red-700 text-xs px-2 py-1 border border-red-200 rounded-lg">ลบ</button>`:'<span class="text-xs text-gray-400">—</span>'}
+                                <div class="flex gap-1 justify-center">
+                                    <button data-edit-user="${u.id}" class="edit-user-btn text-blue-500 hover:text-blue-700 text-xs px-2 py-1 border border-blue-200 rounded-lg">✏️ แก้ไข</button>
+                                    ${u.id!==this.auth.currentUser?.id?`<button data-delete-user="${u.id}" class="delete-user-btn text-red-500 hover:text-red-700 text-xs px-2 py-1 border border-red-200 rounded-lg">ลบ</button>`:'<span class="text-xs text-gray-400">—</span>'}
+                                </div>
                             </td>
                         </tr>`).join('')}</tbody>
                     </table>
@@ -965,7 +1105,8 @@ class POSApp {
         const fo = this.auth.can('all_reports')
             ? this.getFilteredOrders()
             : this.state.orders.filter(o=>o.staffId===this.auth.currentUser?.id);
-        return`<div class="p-5">${!fo.length?'<div class="text-center py-8 text-gray-400">ไม่มีข้อมูล</div>':`<div class="overflow-x-auto"><table class="w-full text-xs"><thead class="bg-gray-50"><tr><th class="px-3 py-2 text-left">วันที่/เวลา</th><th class="px-3 py-2 text-left">รายการ</th><th class="px-3 py-2 text-left">พนักงาน</th><th class="px-3 py-2 text-right">ยอดรวม</th><th class="px-3 py-2 text-right">ส่วนลด</th><th class="px-3 py-2 text-right">VAT</th><th class="px-3 py-2 text-right">สุทธิ</th><th class="px-3 py-2 text-right">กำไร</th></tr></thead><tbody>${fo.map(o=>{const d=new Date(o.timestamp);return`<tr class="border-t hover:bg-gray-50"><td class="px-3 py-2"><div>${d.toLocaleDateString('th-TH')}</div><div class="text-gray-400">${d.toLocaleTimeString('th-TH')}</div></td><td class="px-3 py-2">${o.items.map(i=>`${i.name}x${i.quantity}`).join(', ')}</td><td class="px-3 py-2 text-gray-500">${o.staffName||'—'}</td><td class="px-3 py-2 text-right">฿${o.subtotal.toFixed(2)}</td><td class="px-3 py-2 text-right text-red-500">-฿${o.discount.toFixed(2)}</td><td class="px-3 py-2 text-right">฿${o.vat.toFixed(2)}</td><td class="px-3 py-2 text-right font-bold">฿${o.total.toFixed(2)}</td><td class="px-3 py-2 text-right font-bold text-emerald-700">฿${o.profit.toFixed(2)}</td></tr>`;}).join('')}</tbody></table></div>`}</div>`;
+        const canManage = this.auth.can('clear');
+        return`<div class="p-5">${!fo.length?'<div class="text-center py-8 text-gray-400">ไม่มีข้อมูล</div>':`<div class="overflow-x-auto"><table class="w-full text-xs"><thead class="bg-gray-50"><tr><th class="px-3 py-2 text-left">วันที่/เวลา</th><th class="px-3 py-2 text-left">รายการ</th><th class="px-3 py-2 text-left">พนักงาน</th><th class="px-3 py-2 text-right">ยอดรวม</th><th class="px-3 py-2 text-right">ส่วนลด</th><th class="px-3 py-2 text-right">VAT</th><th class="px-3 py-2 text-right">สุทธิ</th><th class="px-3 py-2 text-right">กำไร</th>${canManage?'<th class="px-3 py-2 text-center">จัดการ</th>':''}</tr></thead><tbody>${fo.map(o=>{const d=new Date(o.timestamp);return`<tr class="border-t hover:bg-gray-50"><td class="px-3 py-2"><div>${d.toLocaleDateString('th-TH')}</div><div class="text-gray-400">${d.toLocaleTimeString('th-TH')}</div></td><td class="px-3 py-2">${o.items.map(i=>`${i.name}x${i.quantity}`).join(', ')}</td><td class="px-3 py-2 text-gray-500">${o.staffName||'—'}</td><td class="px-3 py-2 text-right">฿${o.subtotal.toFixed(2)}</td><td class="px-3 py-2 text-right text-red-500">-฿${o.discount.toFixed(2)}</td><td class="px-3 py-2 text-right">฿${o.vat.toFixed(2)}</td><td class="px-3 py-2 text-right font-bold">฿${o.total.toFixed(2)}</td><td class="px-3 py-2 text-right font-bold text-emerald-700">฿${o.profit.toFixed(2)}</td>${canManage?`<td class="px-3 py-2 text-center"><div class="flex gap-1 justify-center"><button data-edit-order-modal="${o.id}" class="edit-order-modal-btn text-xs px-2 py-1 rounded border border-blue-200 text-blue-600 hover:bg-blue-50 transition">✏️</button><button data-void-order="${o.id}" class="void-order-btn text-xs px-2 py-1 rounded border border-red-200 text-red-500 hover:bg-red-50 transition">🗑️</button></div></td>`:''}</tr>`;}).join('')}</tbody></table></div>`}</div>`;
     }
 
     // ==================== DASHBOARD (kept from original, simplified) ====================
@@ -982,22 +1123,117 @@ class POSApp {
         const availWeeks=this.getAvailableWeeks(allOrders);
         return`<div><div style="background:#F0FDFA;border-bottom:1px solid #B2DFDB;padding:10px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:11px;color:#888;font-weight:600">🔽 ช่วงเวลา:</span><div style="display:flex;gap:4px">${[{id:'all',l:'ทั้งหมด'},{id:'day',l:'📆 รายวัน'},{id:'week',l:'📅 สัปดาห์'},{id:'month',l:'🗓 เดือน'},{id:'year',l:'📊 ปี'}].map(t=>`<button data-dash-period="${t.id}" class="fbtn-dash ${dp===t.id?'active':''}">${t.l}</button>`).join('')}</div>${dp!=='all'?`<label style="display:flex;align-items:center;gap:5px;font-size:11px;color:#666;cursor:pointer"><input type="checkbox" id="dash-compare" ${this.state.dashCompare?'checked':''} style="accent-color:#00BFA5"/>🔄 เทียบกัน</label>`:''}</div>
         ${dp!=='all'?`<div style="background:white;border-bottom:1px solid #B2DFDB;padding:8px 20px;display:flex;flex-direction:column;gap:6px">
-            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><div style="flex:1;display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:8px;background:#e8f4fd;border:1px solid #b3d9f5"><span style="font-size:10px;font-weight:700;color:#0078d4">A</span>${dp==='day'?`<input type="date" id="dash-date" value="${this.state.dashDate}" class="date-input" style="font-size:12px"><div style="display:flex;gap:2px"><button class="dash-nav" data-dash-nav="prev-day" style="padding:2px 8px;border:1px solid #ddd;border-radius:4px;font-size:10px;cursor:pointer;background:white">◀</button><button class="dash-nav" data-dash-nav="today" style="padding:2px 8px;border-radius:4px;font-size:10px;cursor:pointer;background:#0078d4;color:white;border:none">วันนี้</button><button class="dash-nav" data-dash-nav="next-day" style="padding:2px 8px;border:1px solid #ddd;border-radius:4px;font-size:10px;cursor:pointer;background:white">▶</button></div>`:''}${dp==='week'?`<select id="dash-week" class="date-input" style="font-size:12px">${availWeeks.map(w=>`<option value="${w.key}" ${w.key===this.state.dashWeekOffset+''?'selected':''}>${w.label}</option>`).join('')}</select>`:''} ${dp==='month'?`<select id="dash-month" class="date-input" style="font-size:12px">${availMonths.map(m=>`<option value="${m}" ${m===this.state.dashMonthKey?'selected':''}>${this.getMonthNameFull(m)}</option>`).join('')}</select>`:''} ${dp==='year'?`<select id="dash-year" class="date-input" style="font-size:12px">${availYears.map(y=>`<option value="${y}" ${y===this.state.dashYear?'selected':''}>${parseInt(y)+543}</option>`).join('')}</select>`:''}</div></div>
-            ${this.state.dashCompare?`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><div style="flex:1;display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:8px;background:#fdf0e0;border:1px solid #f0c070"><span style="font-size:10px;font-weight:700;color:#d07000">B</span>${dp==='day'?`<input type="date" id="dash-date2" value="${this.state.dashDate2||''}" class="date-input" style="font-size:12px">`:''}${dp==='week'?`<select id="dash-week2" class="date-input" style="font-size:12px">${availWeeks.map(w=>`<option value="${w.key}" ${w.key===(this.state.dashWeekOffset2!=null?this.state.dashWeekOffset2+'':'1')?'selected':''}>${w.label}</option>`).join('')}</select>`:''} ${dp==='month'?`<select id="dash-month2" class="date-input" style="font-size:12px">${availMonths.map(m=>`<option value="${m}" ${m===(this.state.dashMonthKey2||availMonths[1]||availMonths[0])?'selected':''}>${this.getMonthNameFull(m)}</option>`).join('')}</select>`:''} ${dp==='year'?`<select id="dash-year2" class="date-input" style="font-size:12px">${availYears.map(y=>`<option value="${y}" ${y===(this.state.dashYear2||availYears[1]||availYears[0])?'selected':''}>${parseInt(y)+543}</option>`).join('')}</select>`:''}</div></div>`:''}
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><div style="flex:1;display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:8px;background:#e8f4fd;border:1px solid #b3d9f5">${dp==='day'?`<input type="date" id="dash-date" value="${this.state.dashDate}" class="date-input" style="font-size:12px"><div style="display:flex;gap:2px"><button class="dash-nav" data-dash-nav="prev-day" style="padding:2px 8px;border:1px solid #ddd;border-radius:4px;font-size:10px;cursor:pointer;background:white">◀</button><button class="dash-nav" data-dash-nav="today" style="padding:2px 8px;border-radius:4px;font-size:10px;cursor:pointer;background:#0078d4;color:white;border:none">วันนี้</button><button class="dash-nav" data-dash-nav="next-day" style="padding:2px 8px;border:1px solid #ddd;border-radius:4px;font-size:10px;cursor:pointer;background:white">▶</button></div>`:''}${dp==='week'?`<select id="dash-week" class="date-input" style="font-size:12px">${availWeeks.map(w=>`<option value="${w.key}" ${w.key===this.state.dashWeekOffset+''?'selected':''}>${w.label}</option>`).join('')}</select>`:''} ${dp==='month'?`<select id="dash-month" class="date-input" style="font-size:12px">${availMonths.map(m=>`<option value="${m}" ${m===this.state.dashMonthKey?'selected':''}>${this.getMonthNameFull(m)}</option>`).join('')}</select>`:''} ${dp==='year'?`<select id="dash-year" class="date-input" style="font-size:12px">${availYears.map(y=>`<option value="${y}" ${y===this.state.dashYear?'selected':''}>${parseInt(y)+543}</option>`).join('')}</select>`:''}</div></div>
+            ${this.state.dashCompare?`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><div style="flex:1;display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:8px;background:#fdf0e0;border:1px solid #f0c070">${dp==='day'?`<input type="date" id="dash-date2" value="${this.state.dashDate2||''}" class="date-input" style="font-size:12px">`:''}${dp==='week'?`<select id="dash-week2" class="date-input" style="font-size:12px">${availWeeks.map(w=>`<option value="${w.key}" ${w.key===(this.state.dashWeekOffset2!=null?this.state.dashWeekOffset2+'':'1')?'selected':''}>${w.label}</option>`).join('')}</select>`:''} ${dp==='month'?`<select id="dash-month2" class="date-input" style="font-size:12px">${availMonths.map(m=>`<option value="${m}" ${m===(this.state.dashMonthKey2||availMonths[1]||availMonths[0]||'')?'selected':''}>${this.getMonthNameFull(m)}</option>`).join('')}</select>`:''} ${dp==='year'?`<select id="dash-year2" class="date-input" style="font-size:12px">${availYears.map(y=>`<option value="${y}" ${y===(this.state.dashYear2||availYears[1]||availYears[0])?'selected':''}>${parseInt(y)+543}</option>`).join('')}</select>`:''}</div></div>`:''}
         </div>`:''}
-        <div style="background:white;border-bottom:1px solid #B2DFDB;padding:6px 20px;font-size:11px;display:flex;gap:12px"><span style="font-weight:700;color:#0078d4">📅 A: ${periodLabel}</span><span style="color:#888">${orders.length.toLocaleString()} ออเดอร์</span></div>
+
         <div class="flex gap-1 px-4 pt-3" style="border-bottom:1px solid #B2DFDB">${[{id:'overview',l:'📊 ภาพรวม'},{id:'products',l:'🏆 สินค้า'},{id:'time',l:'⏰ ช่วงเวลา'},{id:'detail',l:'📋 รายละเอียด'}].map(t=>`<button data-dash-sub="${t.id}" class="pbi-stab ${st===t.id?'active':''}">${t.l}</button>`).join('')}</div>
         <div class="p-5">${st==='overview'?this.renderPBIOverview(agg,orders,prevAgg):''}${st==='products'?this.renderPBIProducts(agg,orders):''}${st==='time'?this.renderPBITime(agg):''}${st==='detail'?this.renderPBIDetail(agg):''}</div></div>`;
     }
 
     getAvailableWeeks(orders){const weeks=[];if(!orders.length)return weeks;const dates=orders.map(o=>new Date(o.timestamp)).sort((a,b)=>b-a);const now=new Date();now.setHours(0,0,0,0);const day=now.getDay();const diff=now.getDate()-day+(day===0?-6:1);const thisMonday=new Date(now);thisMonday.setDate(diff);const earliest=new Date(Math.min(...dates));earliest.setHours(0,0,0,0);let d=new Date(thisMonday);let offset=0;while(d>=earliest&&offset<52){const end=new Date(d);end.setDate(d.getDate()+6);const dd=d.getDate(),mm=d.getMonth()+1,dd2=end.getDate(),mm2=end.getMonth()+1;const mTh=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];weeks.push({key:String(offset),label:`${dd} ${mTh[mm]} - ${dd2} ${mTh[mm2]} ${end.getFullYear()+543}`,start:new Date(d),end:new Date(end)});d.setDate(d.getDate()-7);offset++;}return weeks;}
 
-    getDashFilteredOrders(allOrders){const dp=this.state.dashPeriod;const mTh=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];const fmtDate=(dk)=>{const[y,m,d]=dk.split('-');return`${parseInt(d)} ${mTh[parseInt(m)]} ${parseInt(y)+543}`;};if(dp==='all')return{orders:allOrders,prevOrders:[],periodLabel:'ทั้งหมด',prevLabel:''};if(dp==='day'){const dk=this.state.dashDate;const orders=allOrders.filter(o=>o.timestamp.startsWith(dk));const dk2=this.state.dashDate2;const prevOrders=this.state.dashCompare?allOrders.filter(o=>o.timestamp.startsWith(dk2)):[];return{orders,prevOrders,periodLabel:fmtDate(dk),prevLabel:fmtDate(dk2)};}if(dp==='week'){const weeks=this.getAvailableWeeks(allOrders);const fW=(offset)=>{const w=weeks.find(w=>w.key===String(offset));if(!w)return{orders:[],label:'—'};const s=new Date(w.start);s.setHours(0,0,0,0);const e=new Date(w.end);e.setHours(23,59,59,999);return{orders:allOrders.filter(o=>{const t=new Date(o.timestamp);return t>=s&&t<=e;}),label:w.label};};const a=fW(parseInt(this.state.dashWeekOffset)||0);const b=this.state.dashCompare?fW(parseInt(this.state.dashWeekOffset2)||1):{orders:[],label:''};return{orders:a.orders,prevOrders:b.orders,periodLabel:a.label,prevLabel:b.label};}if(dp==='month'){const mk=this.state.dashMonthKey;const orders=allOrders.filter(o=>{const d=new Date(o.timestamp);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`===mk;});const mk2=this.state.dashMonthKey2;const prevOrders=this.state.dashCompare?allOrders.filter(o=>{const d=new Date(o.timestamp);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`===mk2;}):[];return{orders,prevOrders,periodLabel:this.getMonthNameFull(mk),prevLabel:this.getMonthNameFull(mk2)};}if(dp==='year'){const yk=this.state.dashYear;const orders=allOrders.filter(o=>o.timestamp.startsWith(yk));const yk2=this.state.dashYear2;const prevOrders=this.state.dashCompare?allOrders.filter(o=>o.timestamp.startsWith(yk2)):[];return{orders,prevOrders,periodLabel:`ปี พ.ศ. ${parseInt(yk)+543}`,prevLabel:`ปี พ.ศ. ${parseInt(yk2)+543}`};}return{orders:allOrders,prevOrders:[],periodLabel:'',prevLabel:''};}
+    getDashFilteredOrders(allOrders){const dp=this.state.dashPeriod;const mTh=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];const fmtDate=(dk)=>{const[y,m,d]=dk.split('-');return`${parseInt(d)} ${mTh[parseInt(m)]} ${parseInt(y)+543}`;};if(dp==='all')return{orders:allOrders,prevOrders:[],periodLabel:'ทั้งหมด',prevLabel:''};if(dp==='day'){const dk=this.state.dashDate;const orders=allOrders.filter(o=>o.timestamp.startsWith(dk));const dk2=this.state.dashDate2;const prevOrders=this.state.dashCompare?allOrders.filter(o=>o.timestamp.startsWith(dk2)):[];return{orders,prevOrders,periodLabel:fmtDate(dk),prevLabel:fmtDate(dk2)};}if(dp==='week'){const weeks=this.getAvailableWeeks(allOrders);const fW=(offset)=>{const w=weeks.find(w=>w.key===String(offset));if(!w)return{orders:[],label:'—'};const s=new Date(w.start);s.setHours(0,0,0,0);const e=new Date(w.end);e.setHours(23,59,59,999);return{orders:allOrders.filter(o=>{const t=new Date(o.timestamp);return t>=s&&t<=e;}),label:w.label};};const a=fW(parseInt(this.state.dashWeekOffset)||0);const b=this.state.dashCompare?fW(parseInt(this.state.dashWeekOffset2)||1):{orders:[],label:''};return{orders:a.orders,prevOrders:b.orders,periodLabel:a.label,prevLabel:b.label};}if(dp==='month'){const availMonths=this.getAvailableMonths();const mk=this.state.dashMonthKey||availMonths[0]||'';const orders=allOrders.filter(o=>{const d=new Date(o.timestamp);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`===mk;});const mk2=this.state.dashMonthKey2||availMonths[1]||availMonths[0]||'';const prevOrders=this.state.dashCompare?allOrders.filter(o=>{const d=new Date(o.timestamp);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`===mk2;}):[];return{orders,prevOrders,periodLabel:this.getMonthNameFull(mk),prevLabel:this.getMonthNameFull(mk2)};}if(dp==='year'){const yk=this.state.dashYear;const orders=allOrders.filter(o=>o.timestamp.startsWith(yk));const yk2=this.state.dashYear2;const prevOrders=this.state.dashCompare?allOrders.filter(o=>o.timestamp.startsWith(yk2)):[];return{orders,prevOrders,periodLabel:`ปี พ.ศ. ${parseInt(yk)+543}`,prevLabel:`ปี พ.ศ. ${parseInt(yk2)+543}`};}return{orders:allOrders,prevOrders:[],periodLabel:'',prevLabel:''};}
 
     aggregateDashboardData(orders){const daily={},hourly={},prodMap={},catMap={};orders.forEach(o=>{const d=new Date(o.timestamp);const dk=d.toISOString().split('T')[0];const h=d.getHours();if(!daily[dk])daily[dk]={date:dk,rev:0,cost:0,profit:0,orders:0,items:0};daily[dk].rev+=o.total;daily[dk].cost+=o.totalCost;daily[dk].profit+=o.profit;daily[dk].orders++;daily[dk].items+=o.items.reduce((s,i)=>s+i.quantity,0);if(!hourly[h])hourly[h]={hour:h,rev:0,orders:0};hourly[h].rev+=o.total;hourly[h].orders++;o.items.forEach(item=>{const k=item.originalName||item.name;if(!prodMap[k])prodMap[k]={name:k,catKey:item.category,cat:this.getCategoryName(item.category),qty:0,rev:0,cost:0,profit:0};prodMap[k].qty+=item.quantity;prodMap[k].rev+=item.price*item.quantity;prodMap[k].cost+=item.cost*item.quantity;prodMap[k].profit+=(item.price-item.cost)*item.quantity;const ck=item.category;if(!catMap[ck])catMap[ck]={name:this.getCategoryName(ck),catKey:ck,rev:0,qty:0,profit:0,color:({coffee:'#0078d4',tea:'#107c10',softdrink:'#d83b01',bakery:'#8764b8',promotion:'#f2a500',other:'#8a8886'})[ck]||'#ccc'};catMap[ck].rev+=item.price*item.quantity;catMap[ck].qty+=item.quantity;catMap[ck].profit+=(item.price-item.cost)*item.quantity;});});const dailyArr=Object.values(daily).sort((a,b)=>a.date.localeCompare(b.date));return{daily:dailyArr,hourly:Object.values(hourly).sort((a,b)=>a.hour-b.hour),prodMap,catMap,totalOrders:orders.length,totalRev:orders.reduce((s,o)=>s+o.total,0),totalProfit:orders.reduce((s,o)=>s+o.profit,0),totalItems:orders.reduce((s,o)=>s+o.items.reduce((ss,i)=>ss+i.quantity,0),0),totalCost:orders.reduce((s,o)=>s+o.totalCost,0)};}
 
-    renderPBIOverview(agg,orders,prevAgg){const{daily,catMap,totalOrders,totalRev,totalProfit,totalItems}=agg;const days=Math.max(daily.length,1);const margin=totalRev>0?(totalProfit/totalRev*100):0;const pRev=prevAgg?.totalRev||0,pProfit=prevAgg?.totalProfit||0,pOrders=prevAgg?.totalOrders||0,pItems=prevAgg?.totalItems||0;const cmp=(a,b)=>{if(!b)return'';const d=((a-b)/b*100).toFixed(1);return d>0?`<span class="pbi-badge up">▲${d}%</span>`:`<span class="pbi-badge dn">▼${Math.abs(d)}%</span>`;};const cats=Object.entries(catMap).sort((a,b)=>b[1].rev-a[1].rev);const catTotal=cats.reduce((s,[,c])=>s+c.rev,0);return`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px"><div class="pbi-kpi c1"><div style="font-size:18px;margin-bottom:2px">💰</div><div style="font-size:10px;color:#888">ยอดขายรวม</div><div style="font-size:24px;font-weight:700">฿${Math.round(totalRev).toLocaleString()}</div><div style="display:flex;align-items:center;gap:6px;margin-top:4px"><span class="pbi-badge up">${days} วัน</span>${cmp(totalRev,pRev)}<span style="font-size:9px;color:#aaa">~฿${Math.round(totalRev/days).toLocaleString()}/วัน</span></div></div><div class="pbi-kpi c2"><div style="font-size:18px;margin-bottom:2px">📈</div><div style="font-size:10px;color:#888">กำไรสุทธิ</div><div style="font-size:24px;font-weight:700">฿${Math.round(totalProfit).toLocaleString()}</div><div style="display:flex;align-items:center;gap:6px;margin-top:4px"><span class="pbi-badge up">Margin ${margin.toFixed(1)}%</span>${cmp(totalProfit,pProfit)}</div></div><div class="pbi-kpi c3"><div style="font-size:18px;margin-bottom:2px">🧾</div><div style="font-size:10px;color:#888">จำนวนออเดอร์</div><div style="font-size:24px;font-weight:700">${totalOrders.toLocaleString()}</div><div style="display:flex;align-items:center;gap:6px;margin-top:4px"><span class="pbi-badge neu">~${Math.round(totalOrders/days)}/วัน</span>${cmp(totalOrders,pOrders)}</div></div><div class="pbi-kpi c4"><div style="font-size:18px;margin-bottom:2px">📦</div><div style="font-size:10px;color:#888">จำนวนชิ้น</div><div style="font-size:24px;font-weight:700">${totalItems.toLocaleString()}</div><div style="display:flex;align-items:center;gap:6px;margin-top:4px"><span class="pbi-badge neu">~${Math.round(totalItems/days)}/วัน</span>${cmp(totalItems,pItems)}</div></div></div><div style="display:grid;grid-template-columns:3fr 2fr;gap:12px;margin-bottom:14px"><div class="pbi-card"><div class="pbi-card-header"><div class="pbi-card-title">📉 แนวโน้มยอดขาย</div><div class="pbi-actions"><button class="pbi-abtn ${(this._pbiLineMode||'rev')==='rev'?'active':''}" data-line-mode="rev">ยอดขาย</button><button class="pbi-abtn ${this._pbiLineMode==='profit'?'active':''}" data-line-mode="profit">กำไร</button><button class="pbi-abtn ${this._pbiLineMode==='orders'?'active':''}" data-line-mode="orders">ออเดอร์</button></div></div><canvas id="pbiLineChart" height="130"></canvas></div><div class="pbi-card"><div class="pbi-card-header"><div class="pbi-card-title">🍩 สัดส่วนหมวดหมู่</div><div class="pbi-actions"><button class="pbi-abtn active" data-donut-mode="rev">ยอดขาย</button><button class="pbi-abtn" data-donut-mode="qty">จำนวน</button></div></div><div style="display:flex;gap:12px;align-items:center"><canvas id="pbiDonutChart" width="120" height="120" style="flex-shrink:0"></canvas><div style="flex:1">${cats.map(([k,c])=>`<div class="dl-row"><div class="dl-dot" style="background:${c.color}"></div><div style="font-size:11px;flex:1">${c.name}</div><div style="font-size:11px;font-weight:700">฿${Math.round(c.rev).toLocaleString()}</div><div style="font-size:10px;color:#888;min-width:35px;text-align:right">${catTotal>0?(c.rev/catTotal*100).toFixed(1):0}%</div></div>`).join('')}</div></div></div></div><div class="pbi-card"><div class="pbi-card-header"><div class="pbi-card-title">📊 ยอดขายรายวัน</div></div><canvas id="pbiBarChart" height="90"></canvas></div>`;}
+    renderPBIOverview(agg,orders,prevAgg){
+        const{daily,catMap,totalOrders,totalRev,totalProfit,totalItems}=agg;
+        const days=Math.max(daily.length,1);
+        const margin=totalRev>0?(totalProfit/totalRev*100):0;
+        const pRev=prevAgg?.totalRev||0,pProfit=prevAgg?.totalProfit||0,pOrders=prevAgg?.totalOrders||0,pItems=prevAgg?.totalItems||0;
+        const hasCompare=!!(prevAgg&&(pRev||pOrders));
 
+        // Helper: diff badge for non-compare mode
+        const cmp=(a,b)=>{if(!b)return'';const d=((a-b)/b*100).toFixed(1);return d>0?`<span class="pbi-badge up">▲${d}%</span>`:`<span class="pbi-badge dn">▼${Math.abs(d)}%</span>`;};
+        const cats=Object.entries(catMap).sort((a,b)=>b[1].rev-a[1].rev);
+        const catTotal=cats.reduce((s,[,c])=>s+c.rev,0);
+
+        // ===== COMPARE MODE: big clear A vs B cards =====
+        if(hasCompare){
+            const pDays=Math.max(prevAgg.daily.length,1);
+            const pMargin=pRev>0?(pProfit/pRev*100):0;
+            const aLabel=this.state.dashCompare?(this._compareLabels?.a||'ช่วง A'):'ช่วง A';
+            const bLabel=this.state.dashCompare?(this._compareLabels?.b||'ช่วง B'):'ช่วง B';
+
+            const diffPct=(a,b)=>{if(!b)return null;return((a-b)/b*100);};
+            const arrow=(a,b,flip=false)=>{
+                const d=diffPct(a,b);if(d===null)return'';
+                const up=flip?(d<0):(d>0);
+                const pct=Math.abs(d).toFixed(1);
+                if(Math.abs(d)<0.5)return`<span style="background:#f3f2f1;color:#666;padding:3px 10px;border-radius:20px;font-size:13px;font-weight:700">≈ เท่าเดิม</span>`;
+                return up
+                    ?`<span style="background:#dff6dd;color:#107c10;padding:3px 10px;border-radius:20px;font-size:13px;font-weight:700">▲ ดีขึ้น ${pct}%</span>`
+                    :`<span style="background:#fde7e9;color:#a4262c;padding:3px 10px;border-radius:20px;font-size:13px;font-weight:700">▼ ลดลง ${pct}%</span>`;
+            };
+            const barCmp=(a,b)=>{
+                const total=a+b;if(!total)return'';
+                const aPct=(a/total*100).toFixed(1);
+                const bPct=(b/total*100).toFixed(1);
+                return`<div style="display:flex;height:10px;border-radius:5px;overflow:hidden;margin:6px 0">
+                    <div style="width:${aPct}%;background:#0078d4"></div>
+                    <div style="width:${bPct}%;background:#d07000"></div>
+                </div><div style="display:flex;justify-content:space-between;font-size:10px;color:#888"><span style="color:#0078d4">🔵 A: ${aPct}%</span><span style="color:#d07000">🟠 B: ${bPct}%</span></div>`;
+            };
+            const metrics=[
+                {icon:'💰',label:'ยอดขายรวม',a:totalRev,b:pRev,fmt:v=>'฿'+Math.round(v).toLocaleString(),sub:(v,d)=>`~฿${Math.round(v/d).toLocaleString()}/วัน`},
+                {icon:'📈',label:'กำไรสุทธิ',a:totalProfit,b:pProfit,fmt:v=>'฿'+Math.round(v).toLocaleString(),sub:(v,d,r)=>r>0?`Margin ${(v/r*100).toFixed(1)}%`:'',subA:(v)=>margin.toFixed(1)+'%',subB:(v)=>pMargin.toFixed(1)+'%',isProfit:true},
+                {icon:'🧾',label:'ออเดอร์',a:totalOrders,b:pOrders,fmt:v=>v.toLocaleString(),sub:(v,d)=>`~${Math.round(v/d)}/วัน`},
+                {icon:'📦',label:'จำนวนชิ้น',a:totalItems,b:pItems,fmt:v=>v.toLocaleString(),sub:(v,d)=>`~${Math.round(v/d)}/วัน`},
+            ];
+
+            return`
+            <!-- COMPARE METRIC CARDS -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+            ${metrics.map(m=>`
+            <div style="background:white;border:1px solid #e0ddd8;border-radius:12px;padding:16px">
+                <div style="font-size:12px;color:#888;font-weight:600;margin-bottom:8px">${m.icon} ${m.label}</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+                    <div style="background:#e8f4fd;border-radius:8px;padding:10px;text-align:center">
+                        <div style="font-size:10px;color:#0078d4;font-weight:700;margin-bottom:4px">🔵 A</div>
+                        <div style="font-size:18px;font-weight:800;color:#003366">${m.fmt(m.a)}</div>
+                        <div style="font-size:10px;color:#0078d4;margin-top:2px">${m.sub(m.a,days,totalRev)}</div>
+                    </div>
+                    <div style="background:#fdf0e0;border-radius:8px;padding:10px;text-align:center">
+                        <div style="font-size:10px;color:#d07000;font-weight:700;margin-bottom:4px">🟠 B</div>
+                        <div style="font-size:18px;font-weight:800;color:#5a3000">${m.fmt(m.b)}</div>
+                        <div style="font-size:10px;color:#d07000;margin-top:2px">${m.sub(m.b,pDays,pRev)}</div>
+                    </div>
+                </div>
+                ${barCmp(m.a,m.b)}
+                <div style="text-align:center;margin-top:8px">${arrow(m.a,m.b)}</div>
+            </div>`).join('')}
+            </div>
+
+            <!-- COMPARE CHART (Bar side by side, monthly/daily avg) -->
+            <div class="pbi-card" style="margin-bottom:12px">
+                <div class="pbi-card-header">
+                    <div class="pbi-card-title">📊 เปรียบเทียบรายวัน (ค่าเฉลี่ย)</div>
+                    <div class="pbi-actions"><button class="pbi-abtn ${(this._pbiLineMode||'rev')==='rev'?'active':''}" data-line-mode="rev">ยอดขาย</button><button class="pbi-abtn ${this._pbiLineMode==='profit'?'active':''}" data-line-mode="profit">กำไร</button><button class="pbi-abtn ${this._pbiLineMode==='orders'?'active':''}" data-line-mode="orders">ออเดอร์</button></div>
+                </div>
+                <canvas id="pbiLineChart" height="100"></canvas>
+            </div>
+
+            <!-- CATEGORY BREAKDOWN COMPARE -->
+            <div class="pbi-card">
+                <div class="pbi-card-header"><div class="pbi-card-title">🏷️ หมวดหมู่ — A เทียบ B</div></div>
+                <div style="overflow-x:auto"><table style="width:100%;font-size:12px;border-collapse:collapse">
+                <thead><tr style="background:#f8f8f8"><th style="padding:8px 10px;text-align:left;color:#666">หมวด</th><th style="padding:8px 10px;text-align:right;color:#0078d4">🔵 A</th><th style="padding:8px 10px;text-align:right;color:#d07000">🟠 B</th><th style="padding:8px 10px;text-align:center;color:#666">เทียบ</th></tr></thead>
+                <tbody>${this.categories.map(cat=>{
+                    const aVal=agg.catMap[cat.id]?.rev||0;
+                    const bVal=prevAgg?.catMap?.[cat.id]?.rev||0;
+                    if(!aVal&&!bVal)return'';
+                    const d=bVal>0?((aVal-bVal)/bVal*100):null;
+                    const badge=d===null?'':Math.abs(d)<0.5?`<span style="background:#f3f2f1;color:#666;padding:2px 8px;border-radius:10px;font-size:11px">≈</span>`:d>0?`<span style="background:#dff6dd;color:#107c10;padding:2px 8px;border-radius:10px;font-size:11px">▲${Math.abs(d).toFixed(0)}%</span>`:`<span style="background:#fde7e9;color:#a4262c;padding:2px 8px;border-radius:10px;font-size:11px">▼${Math.abs(d).toFixed(0)}%</span>`;
+                    return`<tr style="border-top:1px solid #f0ede8"><td style="padding:8px 10px">${cat.icon} ${cat.name}</td><td style="padding:8px 10px;text-align:right;font-weight:700;color:#003366">฿${Math.round(aVal).toLocaleString()}</td><td style="padding:8px 10px;text-align:right;font-weight:700;color:#5a3000">฿${Math.round(bVal).toLocaleString()}</td><td style="padding:8px 10px;text-align:center">${badge}</td></tr>`;
+                }).join('')}
+                </tbody></table></div>
+            </div>`;
+        }
+
+        // ===== NORMAL MODE (no compare) =====
+        return`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px"><div class="pbi-kpi c1"><div style="font-size:18px;margin-bottom:2px">💰</div><div style="font-size:10px;color:#888">ยอดขายรวม</div><div style="font-size:24px;font-weight:700">฿${Math.round(totalRev).toLocaleString()}</div><div style="display:flex;align-items:center;gap:6px;margin-top:4px"><span class="pbi-badge up">${days} วัน</span><span style="font-size:9px;color:#aaa">~฿${Math.round(totalRev/days).toLocaleString()}/วัน</span></div></div><div class="pbi-kpi c2"><div style="font-size:18px;margin-bottom:2px">📈</div><div style="font-size:10px;color:#888">กำไรสุทธิ</div><div style="font-size:24px;font-weight:700">฿${Math.round(totalProfit).toLocaleString()}</div><div style="display:flex;align-items:center;gap:6px;margin-top:4px"><span class="pbi-badge up">Margin ${margin.toFixed(1)}%</span></div></div><div class="pbi-kpi c3"><div style="font-size:18px;margin-bottom:2px">🧾</div><div style="font-size:10px;color:#888">จำนวนออเดอร์</div><div style="font-size:24px;font-weight:700">${totalOrders.toLocaleString()}</div><div style="display:flex;align-items:center;gap:6px;margin-top:4px"><span class="pbi-badge neu">~${Math.round(totalOrders/days)}/วัน</span></div></div><div class="pbi-kpi c4"><div style="font-size:18px;margin-bottom:2px">📦</div><div style="font-size:10px;color:#888">จำนวนชิ้น</div><div style="font-size:24px;font-weight:700">${totalItems.toLocaleString()}</div><div style="display:flex;align-items:center;gap:6px;margin-top:4px"><span class="pbi-badge neu">~${Math.round(totalItems/days)}/วัน</span></div></div></div><div style="display:grid;grid-template-columns:3fr 2fr;gap:12px;margin-bottom:14px"><div class="pbi-card"><div class="pbi-card-header"><div class="pbi-card-title">📉 แนวโน้มยอดขาย</div><div class="pbi-actions"><button class="pbi-abtn ${(this._pbiLineMode||'rev')==='rev'?'active':''}" data-line-mode="rev">ยอดขาย</button><button class="pbi-abtn ${this._pbiLineMode==='profit'?'active':''}" data-line-mode="profit">กำไร</button><button class="pbi-abtn ${this._pbiLineMode==='orders'?'active':''}" data-line-mode="orders">ออเดอร์</button></div></div><canvas id="pbiLineChart" height="130"></canvas></div><div class="pbi-card"><div class="pbi-card-header"><div class="pbi-card-title">🍩 สัดส่วนหมวดหมู่</div><div class="pbi-actions"><button class="pbi-abtn active" data-donut-mode="rev">ยอดขาย</button><button class="pbi-abtn" data-donut-mode="qty">จำนวน</button></div></div><div style="display:flex;gap:12px;align-items:center"><canvas id="pbiDonutChart" width="120" height="120" style="flex-shrink:0"></canvas><div style="flex:1">${cats.map(([k,c])=>`<div class="dl-row"><div class="dl-dot" style="background:${c.color}"></div><div style="font-size:11px;flex:1">${c.name}</div><div style="font-size:11px;font-weight:700">฿${Math.round(c.rev).toLocaleString()}</div><div style="font-size:10px;color:#888;min-width:35px;text-align:right">${catTotal>0?(c.rev/catTotal*100).toFixed(1):0}%</div></div>`).join('')}</div></div></div></div><div class="pbi-card"><div class="pbi-card-header"><div class="pbi-card-title">📊 ยอดขายรายวัน</div></div><canvas id="pbiBarChart" height="90"></canvas></div>`;
+    }
     renderPBIProducts(agg){const tc=this.state.dashTopCat;const allProds=Object.values(agg.prodMap);const filtered=tc==='all'?allProds:allProds.filter(p=>p.catKey===tc);const top=filtered.sort((a,b)=>b.qty-a.qty).slice(0,10);const maxQty=top.length?Math.max(...top.map(p=>p.qty)):1;return`<div style="display:flex;gap:5px;margin-bottom:14px;flex-wrap:wrap;align-items:center"><span style="font-size:11px;color:#888;font-weight:600">📦 หมวดหมู่:</span><button data-dtop-cat="all" class="fbtn-dash ${tc==='all'?'active':''}">ทั้งหมด</button>${this.categories.map(c=>`<button data-dtop-cat="${c.id}" class="fbtn-dash ${tc===c.id?'active':''}">${c.icon} ${c.name}</button>`).join('')}</div>${!top.length?'<div class="text-center py-8 text-gray-400">ไม่มีข้อมูล</div>':`<div class="space-y-2">${top.map((p,i)=>`<div class="bar-container"><div class="bar-label">${['🥇','🥈','🥉'][i]||`${i+1}.`} ${p.name}</div><div class="bar-track"><div class="bar-fill" style="width:${(p.qty/maxQty*100).toFixed(1)}%"><span class="bar-value">${p.qty} ชิ้น | ฿${Math.round(p.rev).toLocaleString()}</span></div></div></div>`).join('')}</div>`}`;}
 
     renderPBITime(agg){const {hourly}=agg;if(!hourly.length)return'<div class="text-center py-8 text-gray-400">ไม่มีข้อมูล</div>';const maxH=Math.max(...hourly.map(h=>h.orders));return`<div class="mb-6"><h4 class="font-bold text-sm mb-3">⏰ Peak Hours (ออเดอร์/ชั่วโมง)</h4><div class="flex gap-1 flex-wrap">${Array.from({length:24},(_,h)=>{const f=hourly.find(x=>x.hour===h);const c=f?f.orders:0;const int=c/maxH;const bg=int>.7?'bg-red-500 text-white':int>.4?'bg-gold-400 text-white':int>.1?'bg-yellow-200':'bg-gray-100 text-gray-400';return`<div class="w-10 h-10 rounded-lg flex flex-col items-center justify-center text-xs ${bg}"><div class="font-bold">${String(h).padStart(2,'0')}</div><div style="font-size:9px">${c||''}</div></div>`;}).join('')}</div></div><canvas id="pbiTimeChart" height="100"></canvas>`;}
@@ -1011,31 +1247,53 @@ class POSApp {
         const {orders,prevOrders,periodLabel,prevLabel}=this.getDashFilteredOrders(allOrders);
         const agg=this.aggregateDashboardData(orders);
         const prevAgg=prevOrders&&prevOrders.length?this.aggregateDashboardData(prevOrders):null;
+        const hasCompare=!!(prevAgg&&(prevAgg.totalRev||prevAgg.totalOrders));
+        // Store labels for renderPBIOverview to use
+        this._compareLabels={a:periodLabel,b:prevLabel};
         if(this._pbiCharts){Object.values(this._pbiCharts).forEach(c=>{try{c.destroy();}catch(e){}});} this._pbiCharts={};
         const mode=this._pbiLineMode||'rev';
         const lineEl=document.getElementById('pbiLineChart');
         if(lineEl){
             const ctx=lineEl.getContext('2d');
-            const labels=agg.daily.map(d=>new Date(d.date+'T12:00:00').toLocaleDateString('th-TH',{day:'numeric',month:'short'}));
-            const data=agg.daily.map(d=>mode==='profit'?d.profit:mode==='orders'?d.orders:d.rev);
-            const datasets=[{label:(periodLabel||'ช่วงหลัก')+(mode==='profit'?' (กำไร)':mode==='orders'?' (ออเดอร์)':' (ยอดขาย)'),data,borderColor:'#0078d4',backgroundColor:'#0078d410',fill:true,tension:.3,pointRadius:2,borderWidth:2}];
-            if(prevAgg&&prevAgg.daily.length){
-                // Map prev data by index (day position) to overlay on same x-axis
-                const prevData=prevAgg.daily.map(d=>mode==='profit'?d.profit:mode==='orders'?d.orders:d.rev);
-                // Pad or trim to match main data length
-                const aligned=Array(data.length).fill(null);
-                prevData.forEach((v,i)=>{if(i<data.length)aligned[i]=v;});
-                datasets.push({label:(prevLabel||'ช่วงเปรียบเทียบ')+(mode==='profit'?' (กำไร)':mode==='orders'?' (ออเดอร์)':' (ยอดขาย)'),data:aligned,borderColor:'#f2a500',backgroundColor:'#f2a50010',fill:false,tension:.3,pointRadius:2,borderWidth:2,borderDash:[5,3]});
+            if(hasCompare&&prevAgg&&prevAgg.daily.length){
+                // Compare mode: bar chart ค่าเฉลี่ยต่อวันของสัปดาห์ (จ-อา)
+                const dayNames=['อา','จ','อ','พ','พฤ','ศ','ส'];
+                const getAvgByDow=(dailyArr)=>{
+                    const acc=Array.from({length:7},()=>({sum:0,cnt:0}));
+                    dailyArr.forEach(d=>{const dow=new Date(d.date+'T12:00:00').getDay();const v=mode==='profit'?d.profit:mode==='orders'?d.orders:d.rev;acc[dow].sum+=v;acc[dow].cnt++;});
+                    return acc.map(x=>x.cnt?Math.round(x.sum/x.cnt):0);
+                };
+                const aAvg=getAvgByDow(agg.daily);
+                const bAvg=getAvgByDow(prevAgg.daily);
+                this._pbiCharts.line=new Chart(ctx,{type:'bar',data:{labels:dayNames,datasets:[
+                    {label:'🔵 A (เฉลี่ย/วัน)',data:aAvg,backgroundColor:'#0078d4bb',borderColor:'#0078d4',borderWidth:1,borderRadius:4},
+                    {label:'🟠 B (เฉลี่ย/วัน)',data:bAvg,backgroundColor:'#d07000bb',borderColor:'#d07000',borderWidth:1,borderRadius:4}
+                ]},options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:true,labels:{font:{size:10}}},tooltip:{callbacks:{label:c=>{const lbl=mode==='orders'?` ${Math.round(c.parsed.y).toLocaleString()} ออเดอร์`:`฿${Math.round(c.parsed.y).toLocaleString()}`;return`${c.dataset.label}: ${lbl}`;},title:t=>`วัน${t[0].label}`}}},scales:{x:{ticks:{font:{size:10}},grid:{display:false}},y:{ticks:{font:{size:9},callback:v=>mode==='orders'?v:'฿'+Math.round(v).toLocaleString()},grid:{color:'#F0FDFA'}}}}});
+            } else {
+                // Normal mode
+                const labels=agg.daily.map(d=>new Date(d.date+'T12:00:00').toLocaleDateString('th-TH',{day:'numeric',month:'short'}));
+                const data=agg.daily.map(d=>mode==='profit'?d.profit:mode==='orders'?d.orders:d.rev);
+                this._pbiCharts.line=new Chart(ctx,{type:'line',data:{labels,datasets:[{label:mode==='profit'?'กำไร':mode==='orders'?'ออเดอร์':'ยอดขาย',data,borderColor:'#0078d4',backgroundColor:'#0078d410',fill:true,tension:.3,pointRadius:2,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`฿${Math.round(c.parsed.y).toLocaleString()}`}}},scales:{x:{ticks:{font:{size:9},maxTicksLimit:10},grid:{display:false}},y:{ticks:{font:{size:9},callback:v=>'฿'+Math.round(v).toLocaleString()},grid:{color:'#F0FDFA'}}}}});
             }
-            const showLegend=datasets.length>1;
-            this._pbiCharts.line=new Chart(ctx,{type:'line',data:{labels,datasets},options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:showLegend,labels:{font:{size:9},boxWidth:12}},tooltip:{callbacks:{label:c=>c.dataset.label+': ฿'+Math.round(c.parsed.y).toLocaleString()}}},scales:{x:{ticks:{font:{size:9},maxTicksLimit:10},grid:{display:false}},y:{ticks:{font:{size:9},callback:v=>'฿'+Math.round(v).toLocaleString()},grid:{color:'#F0FDFA'}}}}});
         }
         const donutEl=document.getElementById('pbiDonutChart');
         if(donutEl){const ctx=donutEl.getContext('2d');const cats=Object.values(agg.catMap);const mode2=this._pbiDonutMode||'rev';this._pbiCharts.donut=new Chart(ctx,{type:'doughnut',data:{labels:cats.map(c=>c.name),datasets:[{data:cats.map(c=>mode2==='qty'?c.qty:c.rev),backgroundColor:cats.map(c=>c.color),borderWidth:2,borderColor:'white'}]},options:{responsive:false,plugins:{legend:{display:false}}}});}
         const barEl=document.getElementById('pbiBarChart');
-        if(barEl){const ctx=barEl.getContext('2d');const labels=agg.daily.map(d=>new Date(d.date+'T12:00:00').toLocaleDateString('th-TH',{day:'numeric',month:'short'}));this._pbiCharts.bar=new Chart(ctx,{type:'bar',data:{labels,datasets:[{label:'ยอดขาย',data:agg.daily.map(d=>d.rev),backgroundColor:'#00BFA555',borderColor:'#00BFA5',borderWidth:1},{label:'กำไร',data:agg.daily.map(d=>d.profit),backgroundColor:'#107c1055',borderColor:'#107c10',borderWidth:1}]},options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{labels:{font:{size:9}}}},scales:{x:{ticks:{font:{size:9},maxTicksLimit:14},grid:{display:false}},y:{ticks:{font:{size:9},callback:v=>'฿'+Math.round(v).toLocaleString()},grid:{color:'#F0FDFA'}}}}});}
+        if(barEl){
+            const ctx=barEl.getContext('2d');
+            const labels=agg.daily.map(d=>new Date(d.date+'T12:00:00').toLocaleDateString('th-TH',{day:'numeric',month:'short'}));
+            const datasets=[
+                {label:'ยอดขาย (A)',data:agg.daily.map(d=>d.rev),backgroundColor:'#00BFA555',borderColor:'#00BFA5',borderWidth:1},
+                {label:'กำไร (A)',data:agg.daily.map(d=>d.profit),backgroundColor:'#107c1055',borderColor:'#107c10',borderWidth:1}
+            ];
+            if(prevAgg&&prevAgg.daily.length){
+                datasets.push({label:'ยอดขาย (B)',data:prevAgg.daily.map(d=>d.rev),backgroundColor:'#d0700040',borderColor:'#d07000',borderWidth:1});
+                datasets.push({label:'กำไร (B)',data:prevAgg.daily.map(d=>d.profit),backgroundColor:'#8764b840',borderColor:'#8764b8',borderWidth:1});
+            }
+            this._pbiCharts.bar=new Chart(ctx,{type:'bar',data:{labels,datasets},options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{labels:{font:{size:9}}}},scales:{x:{ticks:{font:{size:9},maxTicksLimit:14},grid:{display:false}},y:{ticks:{font:{size:9},callback:v=>'฿'+Math.round(v).toLocaleString()},grid:{color:'#F0FDFA'}}}}});
+        }
         const timeEl=document.getElementById('pbiTimeChart');
-        if(timeEl){const ctx=timeEl.getContext('2d');const hrs=Array.from({length:24},(_,h)=>h);const data=hrs.map(h=>{const f=agg.hourly.find(x=>x.hour===h);return f?f.orders:0;});this._pbiCharts.time=new Chart(ctx,{type:'bar',data:{labels:hrs.map(h=>`${String(h).padStart(2,'0')}:00`),datasets:[{label:'ออเดอร์',data,backgroundColor:data.map(v=>v===Math.max(...data)?'#00BFA5':'#e0ddd8'),borderRadius:4}]},options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:8},maxTicksLimit:12},grid:{display:false}},y:{ticks:{font:{size:9},stepSize:1},grid:{color:'#F0FDFA'}}}}});}
+        if(timeEl){const ctx=timeEl.getContext('2d');const hrs=Array.from({length:24},(_,h)=>h);const data=hrs.map(h=>{const f=agg.hourly.find(x=>x.hour===h);return f?f.orders:0;});const datasets2=[{label:'ออเดอร์ (A)',data,backgroundColor:data.map(v=>v===Math.max(...data)?'#00BFA5':'#e0ddd8'),borderRadius:4}];if(prevAgg&&prevAgg.hourly.length){const prevData=hrs.map(h=>{const f=prevAgg.hourly.find(x=>x.hour===h);return f?f.orders:0;});datasets2.push({label:'ออเดอร์ (B)',data:prevData,backgroundColor:'#d0700055',borderRadius:4});}this._pbiCharts.time=new Chart(ctx,{type:'bar',data:{labels:hrs.map(h=>`${String(h).padStart(2,'0')}:00`),datasets:datasets2},options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:datasets2.length>1,labels:{font:{size:9}}}},scales:{x:{ticks:{font:{size:8},maxTicksLimit:12},grid:{display:false}},y:{ticks:{font:{size:9},stepSize:1},grid:{color:'#F0FDFA'}}}}});}
     }
 
     // ==================== DEMO DATA GENERATOR ====================
@@ -1054,6 +1312,222 @@ class POSApp {
         };
         document.getElementById('login-btn')?.addEventListener('click',doLogin);
         document.getElementById('login-password')?.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+    }
+
+    // ==================== PRODUCT MANAGEMENT MODAL ====================
+    saveProducts() { try{localStorage.setItem('pos_products_custom',JSON.stringify(this.products));}catch(e){alert('⚠️ บันทึกสินค้าไม่สำเร็จ');} }
+
+    renderProductMgmtModal() {
+        const cats=this.categories;
+        const editId=this.state.editProductId;
+        const ep=editId?this.products.find(p=>p.id===editId):null;
+        const showAdd=this.state.showAddProduct;
+        const emojis=['☕','🍵','🥤','🍊','🍋','🍓','🫐','🥝','🍌','🍉','🍈','🟡','🔴','🔵','🟢','🟤','💧','🥛','🍫','🧁','🍰','🍞','🥪','🍪','🥐','🏆','🎉','➕','📦','🥗','🍳','🍔'];
+        return `<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-2xl max-w-4xl w-full mx-4" style="max-height:90vh;overflow-y:auto">
+                <div class="flex items-center justify-between p-5 border-b border-gray-100">
+                    <h2 class="text-lg font-bold">🛍️ จัดการสินค้า</h2>
+                    <div class="flex gap-2">
+                        <button class="add-product-btn px-4 py-2 text-sm font-bold text-white rounded-xl" style="background:#00BFA5">+ เพิ่มสินค้าใหม่</button>
+                        <button class="reset-products-btn px-3 py-2 text-xs border-2 border-red-200 text-red-500 rounded-xl hover:bg-red-50">↩️ รีเซ็ต</button>
+                        <button class="close-product-mgmt text-gray-500 hover:text-gray-700 text-2xl">✕</button>
+                    </div>
+                </div>
+                <div class="p-5">
+                ${(showAdd||ep)?`
+                <div class="${ep?'bg-blue-50 border-blue-200':'bg-teal-50 border-teal-200'} border rounded-xl p-4 mb-4">
+                    <div class="font-bold text-sm mb-3">${ep?'✏️ แก้ไขสินค้า':'➕ เพิ่มสินค้าใหม่'}</div>
+                    <div class="grid grid-cols-3 gap-3 mb-3">
+                        <div class="col-span-2"><label class="text-xs font-bold mb-1 block">ชื่อสินค้า</label><input id="prod-name" type="text" value="${ep?ep.name:''}" class="w-full px-3 py-2 border-2 rounded-lg text-sm focus:outline-none" placeholder="เช่น ลาเต้ ร้อน"></div>
+                        <div><label class="text-xs font-bold mb-1 block">หมวดหมู่</label><select id="prod-cat" class="w-full px-3 py-2 border-2 rounded-lg text-sm focus:outline-none">${cats.map(c=>`<option value="${c.id}" ${ep&&ep.category===c.id?'selected':''}>${c.icon} ${c.name}</option>`).join('')}</select></div>
+                        <div><label class="text-xs font-bold mb-1 block">ราคา (฿)</label><input id="prod-price" type="number" min="0" value="${ep?ep.price:''}" class="w-full px-3 py-2 border-2 rounded-lg text-sm focus:outline-none" placeholder="50"></div>
+                        <div><label class="text-xs font-bold mb-1 block">ต้นทุน (฿)</label><input id="prod-cost" type="number" min="0" value="${ep?ep.cost:''}" class="w-full px-3 py-2 border-2 rounded-lg text-sm focus:outline-none" placeholder="18"></div>
+                        <div class="flex flex-col gap-1"><label class="text-xs font-bold mb-1 block">ตัวเลือก</label><label class="flex items-center gap-2 text-xs cursor-pointer"><input type="checkbox" id="prod-isdrink" ${ep&&ep.isDrink?'checked':''} class="accent-teal-500"> เครื่องดื่ม (เลือกความหวาน)</label></div>
+                        <div><label class="text-xs font-bold mb-1 block">ไอคอน Emoji</label><div class="flex gap-1 flex-wrap" id="emoji-picker">${emojis.map(e=>`<button type="button" data-emoji="${e}" class="emoji-pick-btn text-xl w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 border ${ep&&ep.image===e?'border-teal-500 bg-teal-50':'border-transparent'}">${e}</button>`).join('')}</div><input id="prod-emoji" type="text" value="${ep?ep.image:'☕'}" class="mt-1 w-full px-2 py-1 border-2 rounded-lg text-sm focus:outline-none" placeholder="หรือพิมพ์ emoji/URL" maxlength="100"></div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button class="confirm-prod-btn px-4 py-2 text-sm font-bold text-white rounded-lg" style="background:${ep?'#0078d4':'#107c10'}">${ep?'💾 บันทึกการแก้ไข':'✅ เพิ่มสินค้า'}</button>
+                        <button class="cancel-prod-btn px-4 py-2 text-sm border-2 border-gray-300 rounded-lg">ยกเลิก</button>
+                    </div>
+                </div>`:''}
+                <div class="space-y-1">
+                ${cats.map(cat=>{
+                    const catProds=this.products.filter(p=>p.category===cat.id);
+                    if(!catProds.length)return'';
+                    return`<div class="mb-3"><div class="text-xs font-bold text-gray-500 mb-1.5 flex items-center gap-1">${cat.icon} ${cat.name} <span class="text-gray-400">(${catProds.length})</span></div>
+                    <div class="overflow-x-auto"><table class="w-full text-xs"><thead class="bg-gray-50"><tr><th class="px-2 py-1.5 text-left">สินค้า</th><th class="px-2 py-1.5 text-right">ราคา</th><th class="px-2 py-1.5 text-right">ต้นทุน</th><th class="px-2 py-1.5 text-right">กำไร%</th><th class="px-2 py-1.5 text-center">จัดการ</th></tr></thead>
+                    <tbody>${catProds.map(p=>{const margin=p.price>0?((p.price-p.cost)/p.price*100).toFixed(0):0;return`<tr class="border-t hover:bg-gray-50"><td class="px-2 py-1.5"><span class="mr-1">${p.image}</span>${p.name}${p.isDrink?' <span class="text-gray-400">🧋</span>':''}</td><td class="px-2 py-1.5 text-right font-bold">฿${p.price}</td><td class="px-2 py-1.5 text-right text-gray-500">฿${p.cost}</td><td class="px-2 py-1.5 text-right"><span class="px-1 rounded text-xs ${parseInt(margin)>=50?'bg-green-50 text-green-700':parseInt(margin)>=30?'bg-yellow-50 text-yellow-700':'bg-red-50 text-red-700'}">${margin}%</span></td><td class="px-2 py-1.5 text-center"><div class="flex gap-1 justify-center"><button data-edit-prod="${p.id}" class="edit-prod-btn text-blue-500 hover:text-blue-700 px-1.5 py-0.5 border border-blue-200 rounded">✏️</button><button data-del-prod="${p.id}" class="del-prod-btn text-red-500 hover:text-red-700 px-1.5 py-0.5 border border-red-200 rounded">🗑️</button></div></td></tr>`;}).join('')}</tbody></table></div></div>`;
+                }).join('')}
+                </div>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    // ==================== TODAY HISTORY MODAL ====================
+    renderTodayHistoryModal() {
+        const mode = this.state.historyFilterMode || 'today';
+        const selDate = this.state.historyDate || new Date().toISOString().split('T')[0];
+        const today = new Date().toISOString().split('T')[0];
+
+        let filteredOrders;
+        if(mode === 'today') {
+            filteredOrders = this.state.orders.filter(o => o.timestamp.startsWith(today));
+        } else if(mode === 'date') {
+            filteredOrders = this.state.orders.filter(o => o.timestamp.startsWith(selDate));
+        } else {
+            filteredOrders = [...this.state.orders];
+        }
+        filteredOrders = filteredOrders.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+        const totalRevenue = filteredOrders.reduce((s,o) => s+o.total, 0);
+        const totalProfit  = filteredOrders.reduce((s,o) => s+o.profit, 0);
+        const pmIcon  = {cash:'💵', transfer:'📱', card:'💳'};
+        const pmLabel = {cash:'เงินสด', transfer:'โอนเงิน', card:'บัตร'};
+        const canManage = this.auth.can('clear');
+
+        const modeLabel = mode==='today' ? `วันนี้ (${new Date().toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'numeric'})})` : mode==='date' ? new Date(selDate+'T00:00:00').toLocaleDateString('th-TH',{weekday:'short',day:'numeric',month:'long',year:'numeric'}) : 'ทั้งหมด';
+
+        return `<div class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50" id="today-history-overlay">
+            <div class="bg-white rounded-2xl shadow-2xl flex flex-col" style="width:580px;max-height:90vh">
+
+                <!-- Header -->
+                <div class="flex items-center justify-between p-5 border-b border-gray-100">
+                    <div>
+                        <h2 class="text-lg font-bold text-gray-800">🕐 ประวัติออเดอร์</h2>
+                        <div class="text-xs text-gray-400 mt-0.5">${modeLabel}</div>
+                    </div>
+                    <button class="close-today-history text-gray-400 hover:text-gray-700 text-2xl leading-none">✕</button>
+                </div>
+
+                <!-- Filter Bar -->
+                <div class="px-5 py-3 border-b border-gray-100 bg-gray-50 flex items-center gap-2 flex-wrap">
+                    <span class="text-xs text-gray-500 font-semibold">📅 ดูช่วง:</span>
+                    <button data-hist-mode="today" class="hist-mode-btn text-xs px-3 py-1.5 rounded-lg border font-medium transition ${mode==='today'?'bg-teal-500 text-white border-teal-500':'bg-white text-gray-600 border-gray-200 hover:border-teal-400'}">วันนี้</button>
+                    <button data-hist-mode="date"  class="hist-mode-btn text-xs px-3 py-1.5 rounded-lg border font-medium transition ${mode==='date'?'bg-teal-500 text-white border-teal-500':'bg-white text-gray-600 border-gray-200 hover:border-teal-400'}">เลือกวัน</button>
+                    <button data-hist-mode="all"   class="hist-mode-btn text-xs px-3 py-1.5 rounded-lg border font-medium transition ${mode==='all'?'bg-teal-500 text-white border-teal-500':'bg-white text-gray-600 border-gray-200 hover:border-teal-400'}">ทั้งหมด</button>
+                    ${mode==='date'?`<input type="date" id="hist-date-input" value="${selDate}" class="text-xs px-2 py-1.5 border-2 border-teal-300 rounded-lg outline-none focus:border-teal-500" max="${today}"/>`:'' }
+                    <div class="ml-auto flex gap-1">
+                        ${mode==='date'?`<button id="hist-prev-day" class="text-xs px-2 py-1 bg-white border border-gray-200 rounded hover:border-teal-400">◀</button><button id="hist-next-day" class="text-xs px-2 py-1 bg-white border border-gray-200 rounded hover:border-teal-400">▶</button>`:''}
+                    </div>
+                </div>
+
+                <!-- Summary Stats -->
+                <div class="flex gap-3 px-5 py-3 bg-white border-b border-gray-100">
+                    <div class="flex-1 text-center"><div class="text-xs text-gray-500">ออเดอร์</div><div class="text-xl font-bold text-gray-800">${filteredOrders.length}</div></div>
+                    <div class="flex-1 text-center"><div class="text-xs text-gray-500">ยอดขาย</div><div class="text-xl font-bold" style="color:#107c10">฿${totalRevenue.toFixed(0)}</div></div>
+                    <div class="flex-1 text-center"><div class="text-xs text-gray-500">กำไร</div><div class="text-xl font-bold" style="color:#0078d4">฿${totalProfit.toFixed(0)}</div></div>
+                </div>
+
+                <!-- Order List -->
+                <div class="flex-1 overflow-y-auto p-4 space-y-3">
+                    ${filteredOrders.length === 0
+                        ? `<div class="text-center text-gray-400 py-12"><div class="text-4xl mb-3">📭</div><p class="text-sm">ไม่พบออเดอร์ในช่วงที่เลือก</p></div>`
+                        : filteredOrders.map(o => {
+                            const t = new Date(o.timestamp);
+                            const dateStr = t.toLocaleDateString('th-TH',{day:'numeric',month:'short'});
+                            const timeStr = t.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
+                            const pm = o.paymentMethod || 'cash';
+                            return `<div class="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                                <div class="flex items-start justify-between mb-2">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <span class="text-xs font-bold text-gray-500 bg-white px-2 py-0.5 rounded-full border border-gray-200">#${String(o.id).slice(-5)}</span>
+                                        ${mode!=='today'?`<span class="text-xs text-gray-400">📅 ${dateStr}</span>`:''}
+                                        <span class="text-xs text-gray-400">⏰ ${timeStr}</span>
+                                        <span class="text-xs px-2 py-0.5 rounded-full ${pm==='transfer'?'bg-blue-50 text-blue-600':pm==='card'?'bg-purple-50 text-purple-600':'bg-green-50 text-green-600'}">${pmIcon[pm]} ${pmLabel[pm]}</span>
+                                    </div>
+                                    <div class="flex items-center gap-1.5 ml-2 shrink-0">
+                                        <span class="font-bold text-sm" style="color:#107c10">฿${o.total.toFixed(0)}</span>
+                                        ${canManage ? `<button data-edit-order-modal="${o.id}" class="edit-order-modal-btn text-xs px-2 py-1 rounded-lg text-blue-600 border border-blue-200 hover:bg-blue-50 transition">✏️ แก้ไข</button>` : ''}
+                                        ${canManage ? `<button data-void-order="${o.id}" class="void-order-btn text-xs px-2 py-1 rounded-lg text-red-500 border border-red-200 hover:bg-red-50 transition">🗑️</button>` : ''}
+                                    </div>
+                                </div>
+                                <div class="text-xs text-gray-600 space-y-0.5">
+                                    ${o.items.map(i=>`<div class="flex justify-between"><span>${i.name} × ${i.quantity}</span><span class="text-gray-500">฿${(i.price*i.quantity).toFixed(0)}</span></div>`).join('')}
+                                </div>
+                                ${o.discount>0?`<div class="text-xs text-red-500 mt-1">ส่วนลด -฿${o.discount.toFixed(0)}</div>`:''}
+                                ${o.staffName?`<div class="text-xs text-gray-400 mt-1">👤 ${o.staffName}</div>`:''}
+                            </div>`;
+                        }).join('')
+                    }
+                </div>
+
+                <div class="p-4 border-t border-gray-100 text-center">
+                    <p class="text-xs text-gray-400">กด <kbd class="px-1.5 py-0.5 bg-gray-100 rounded border border-gray-300 font-mono text-xs">Esc</kbd> เพื่อปิด</p>
+                </div>
+            </div>
+        </div>
+        ${this.state.showEditOrder && this.state.editOrderId ? this.renderEditOrderModal() : ''}
+        `;
+    }
+
+    renderEditOrderModal() {
+        const oid = this.state.editOrderId;
+        const o = this.state.orders.find(x => x.id === oid);
+        if(!o) return '';
+        const items = this.state.editOrderItems;
+        const subtotal = items.reduce((s,i) => s + i.price*i.quantity, 0);
+        const disc = (subtotal * (this.state.editOrderDiscount||0)) / 100;
+        const vat  = (subtotal - disc) * 0.07;
+        const tot  = subtotal - disc + vat;
+        const pmIcon  = {cash:'💵', transfer:'📱', card:'💳'};
+        const pmLabel = {cash:'เงินสด', transfer:'โอนเงิน', card:'บัตร'};
+        const pm = this.state.editOrderPayment || 'cash';
+        return `<div class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[60]" id="edit-order-overlay">
+            <div class="bg-white rounded-2xl shadow-2xl flex flex-col" style="width:480px;max-height:85vh">
+                <div class="flex items-center justify-between p-5 border-b border-gray-100">
+                    <div>
+                        <h3 class="text-base font-bold text-gray-800">✏️ แก้ไขออเดอร์ #${String(oid).slice(-5)}</h3>
+                        <div class="text-xs text-gray-400 mt-0.5">${new Date(o.timestamp).toLocaleString('th-TH')}</div>
+                    </div>
+                    <button id="close-edit-order" class="text-gray-400 hover:text-gray-700 text-2xl leading-none">✕</button>
+                </div>
+
+                <!-- Items -->
+                <div class="flex-1 overflow-y-auto p-4">
+                    <div class="text-xs font-semibold text-gray-500 mb-2">รายการสินค้า</div>
+                    <div class="space-y-2 mb-4">
+                        ${items.map((item,idx) => `
+                        <div class="flex items-center gap-2 bg-gray-50 rounded-xl p-2.5 border border-gray-100">
+                            <div class="flex-1 text-sm font-medium text-gray-700">${item.name}</div>
+                            <div class="text-xs text-gray-400">฿${item.price}</div>
+                            <div class="flex items-center gap-1">
+                                <button data-edit-qty-dec="${idx}" class="edit-qty-btn w-7 h-7 rounded-full border border-gray-300 bg-white text-gray-600 font-bold text-sm flex items-center justify-center hover:border-red-400 hover:text-red-500">−</button>
+                                <span class="w-6 text-center text-sm font-bold">${item.quantity}</span>
+                                <button data-edit-qty-inc="${idx}" class="edit-qty-btn w-7 h-7 rounded-full border border-gray-300 bg-white text-gray-600 font-bold text-sm flex items-center justify-center hover:border-teal-400 hover:text-teal-600">+</button>
+                            </div>
+                            <div class="text-sm font-bold text-gray-700 w-16 text-right">฿${(item.price*item.quantity).toFixed(0)}</div>
+                            <button data-edit-remove="${idx}" class="edit-remove-btn text-red-400 hover:text-red-600 text-lg leading-none ml-1">✕</button>
+                        </div>`).join('')}
+                    </div>
+
+                    <!-- Discount -->
+                    <div class="flex items-center gap-3 mb-4">
+                        <label class="text-xs font-semibold text-gray-600 w-24">ส่วนลด (%)</label>
+                        <input type="number" id="edit-disc-input" value="${this.state.editOrderDiscount||0}" min="0" max="100" class="w-20 px-2 py-1.5 border-2 border-gray-200 rounded-lg text-sm text-center focus:border-teal-400 outline-none"/>
+                    </div>
+
+                    <!-- Payment -->
+                    <div class="flex items-center gap-2 mb-4 flex-wrap">
+                        <span class="text-xs font-semibold text-gray-600 w-24">ช่องทางชำระ</span>
+                        ${['cash','transfer','card'].map(p=>`<button data-edit-pm="${p}" class="edit-pm-btn text-xs px-3 py-1.5 rounded-lg border font-medium transition ${pm===p?'bg-teal-500 text-white border-teal-500':'bg-white text-gray-600 border-gray-200 hover:border-teal-400'}">${pmIcon[p]} ${pmLabel[p]}</button>`).join('')}
+                    </div>
+
+                    <!-- Total Summary -->
+                    <div class="bg-teal-50 rounded-xl p-3 border border-teal-200 text-sm">
+                        <div class="flex justify-between text-gray-600"><span>ยอดรวม</span><span>฿${subtotal.toFixed(0)}</span></div>
+                        ${disc>0?`<div class="flex justify-between text-red-500"><span>ส่วนลด</span><span>-฿${disc.toFixed(0)}</span></div>`:''}
+                        <div class="flex justify-between text-gray-600"><span>VAT 7%</span><span>฿${vat.toFixed(0)}</span></div>
+                        <div class="flex justify-between font-bold text-teal-700 text-base border-t border-teal-200 mt-1 pt-1"><span>สุทธิ</span><span>฿${tot.toFixed(0)}</span></div>
+                    </div>
+                </div>
+
+                <div class="p-4 border-t border-gray-100 flex gap-3">
+                    <button id="cancel-edit-order" class="flex-1 py-2.5 rounded-xl border border-gray-300 text-gray-600 font-semibold text-sm hover:bg-gray-50 transition">ยกเลิก</button>
+                    <button id="confirm-edit-order" class="flex-1 py-2.5 rounded-xl font-bold text-sm text-white transition" style="background:#00BFA5">✅ บันทึก</button>
+                </div>
+            </div>
+        </div>`;
     }
 
     // ==================== BIND EVENTS ====================
@@ -1176,6 +1650,121 @@ class POSApp {
         document.querySelectorAll('[data-demo-orders]').forEach(el=>el.addEventListener('click',e=>{this.state.demoOrdersPerDay=e.currentTarget.dataset.demoOrders;this.render();}));
         const dp=document.getElementById('demo-peak');if(dp)dp.addEventListener('change',e=>{this.state.demoPeakHour=e.target.checked;this.render();});
         const gb=document.querySelector('.generate-demo-btn');if(gb)gb.addEventListener('click',()=>this.generateDemoData());
+
+        // Discount input
+        const discInput=document.getElementById('discount-input');
+        if(discInput){
+            discInput.addEventListener('input',e=>{let v=parseFloat(e.target.value)||0;v=Math.min(100,Math.max(0,v));this.state.discount=v;this.render();});
+            discInput.addEventListener('blur',e=>{let v=parseFloat(e.target.value)||0;this.state.discount=Math.min(100,Math.max(0,v));this.render();});
+        }
+        const discDec=document.getElementById('disc-dec');if(discDec)discDec.addEventListener('click',()=>{this.state.discount=Math.max(0,this.state.discount-5);this.render();});
+        const discInc=document.getElementById('disc-inc');if(discInc)discInc.addEventListener('click',()=>{this.state.discount=Math.min(100,this.state.discount+5);this.render();});
+
+        // Payment method
+        document.querySelectorAll('.pay-method-btn').forEach(el=>el.addEventListener('click',e=>{this.state.paymentMethod=e.currentTarget.dataset.pay;this.render();}));
+
+        // Edit user
+        document.querySelectorAll('.edit-user-btn').forEach(el=>el.addEventListener('click',e=>{
+            const uid=parseInt(e.currentTarget.dataset.editUser);
+            const u=this.auth.users.find(x=>x.id===uid);
+            if(u){this.state.editUserId=uid;this.state.editUserData={...u};this.state.showAddUser=false;this.render();}
+        }));
+        const ceu=document.querySelector('.cancel-edit-user');if(ceu)ceu.addEventListener('click',()=>{this.state.editUserId=null;this.state.editUserData=null;this.render();});
+        const cfeu=document.querySelector('.confirm-edit-user');if(cfeu)cfeu.addEventListener('click',()=>{
+            const nm=document.getElementById('edit-name')?.value?.trim();
+            const un=document.getElementById('edit-username')?.value?.trim();
+            const pw=document.getElementById('edit-password')?.value?.trim();
+            const rl=document.getElementById('edit-role')?.value;
+            if(!nm||!un){alert('⚠️ กรุณากรอกชื่อและ Username');return;}
+            const uid=this.state.editUserId;
+            const dupl=this.auth.users.find(u=>u.username===un&&u.id!==uid);
+            if(dupl){alert('⚠️ Username นี้มีผู้ใช้แล้ว');return;}
+            const upd={name:nm,username:un,role:rl};
+            if(pw)upd.password=pw;
+            this.auth.updateUser(uid,upd);
+            // Update session if editing self
+            if(this.auth.currentUser?.id===uid){const updated=this.auth.users.find(u=>u.id===uid);this.auth.currentUser={...updated};sessionStorage.setItem('pos_user',JSON.stringify(this.auth.currentUser));}
+            this.state.editUserId=null;this.state.editUserData=null;this.render();
+            alert('✅ แก้ไขข้อมูลผู้ใช้สำเร็จ!');
+        });
+
+        // Product management
+        const pmb=document.querySelector('.product-mgmt-btn');if(pmb)pmb.addEventListener('click',()=>{this.state.showProductMgmt=true;this.state.showAddProduct=false;this.state.editProductId=null;this.render();});
+        const cpm=document.querySelector('.close-product-mgmt');if(cpm)cpm.addEventListener('click',()=>{this.state.showProductMgmt=false;this.state.showAddProduct=false;this.state.editProductId=null;this.render();});
+        const apb=document.querySelector('.add-product-btn');if(apb)apb.addEventListener('click',()=>{this.state.showAddProduct=true;this.state.editProductId=null;this.render();});
+        const cpb=document.querySelector('.cancel-prod-btn');if(cpb)cpb.addEventListener('click',()=>{this.state.showAddProduct=false;this.state.editProductId=null;this.render();});
+        const rpb=document.querySelector('.reset-products-btn');if(rpb)rpb.addEventListener('click',()=>{if(confirm('รีเซ็ตสินค้ากลับเป็นค่าเริ่มต้น?')){localStorage.removeItem('pos_products_custom');location.reload();}});
+        // Emoji picker in product modal
+        document.querySelectorAll('.emoji-pick-btn').forEach(el=>el.addEventListener('click',e=>{const emoji=e.currentTarget.dataset.emoji;const inp=document.getElementById('prod-emoji');if(inp)inp.value=emoji;document.querySelectorAll('.emoji-pick-btn').forEach(b=>b.classList.remove('border-teal-500','bg-teal-50'));e.currentTarget.classList.add('border-teal-500','bg-teal-50');}));
+        // Confirm add/edit product
+        const confpb=document.querySelector('.confirm-prod-btn');if(confpb)confpb.addEventListener('click',()=>{
+            const name=document.getElementById('prod-name')?.value?.trim();
+            const price=parseFloat(document.getElementById('prod-price')?.value);
+            const cost=parseFloat(document.getElementById('prod-cost')?.value)||0;
+            const cat=document.getElementById('prod-cat')?.value;
+            const image=document.getElementById('prod-emoji')?.value?.trim()||'📦';
+            const isDrink=document.getElementById('prod-isdrink')?.checked||false;
+            if(!name||isNaN(price)||price<0){alert('⚠️ กรุณากรอกชื่อและราคาให้ถูกต้อง');return;}
+            if(this.state.editProductId){
+                const idx=this.products.findIndex(p=>p.id===this.state.editProductId);
+                if(idx>=0){this.products[idx]={...this.products[idx],name,price,cost,category:cat,image,isDrink};}
+                this.state.editProductId=null;
+            } else {
+                this.products.push({id:Date.now(),name,price,cost,category:cat,image,isDrink,active:true});
+                this.state.showAddProduct=false;
+            }
+            this.saveProducts();this.render();alert('✅ บันทึกสินค้าสำเร็จ!');
+        });
+        document.querySelectorAll('.edit-prod-btn').forEach(el=>el.addEventListener('click',e=>{
+            const pid=parseInt(e.currentTarget.dataset.editProd);
+            this.state.editProductId=pid;this.state.showAddProduct=false;this.render();
+        }));
+        document.querySelectorAll('.del-prod-btn').forEach(el=>el.addEventListener('click',e=>{
+            const pid=parseInt(e.currentTarget.dataset.delProd);
+            const p=this.products.find(x=>x.id===pid);
+            if(p&&confirm(`ลบ "${p.name}"?`)){this.products=this.products.filter(x=>x.id!==pid);this.saveProducts();this.render();}
+        }));
+        // Today history
+        const thb=document.querySelector('.today-history-btn');if(thb)thb.addEventListener('click',()=>{this.state.showTodayHistory=true;this.render();});
+        const cth=document.querySelector('.close-today-history');if(cth)cth.addEventListener('click',()=>{this.state.showTodayHistory=false;this.render();});
+        const overlay=document.getElementById('today-history-overlay');if(overlay)overlay.addEventListener('click',e=>{if(e.target===overlay){this.state.showTodayHistory=false;this.render();}});
+        document.querySelectorAll('.void-order-btn').forEach(el=>el.addEventListener('click',e=>{
+            const oid=parseInt(e.currentTarget.dataset.voidOrder);
+            const o=this.state.orders.find(x=>x.id===oid);
+            if(o&&confirm(`ยืนยันยกเลิกออเดอร์ #${String(oid).slice(-5)}?\n฿${o.total.toFixed(0)} — ${o.items.map(i=>i.name).join(', ')}`)){
+                this.state.orders=this.state.orders.filter(x=>x.id!==oid);
+                this.saveOrders();this.render();
+            }
+        }));
+
+        // ==================== KEYBOARD SHORTCUTS ====================
+        if(!this._kbBound){
+            this._kbBound=true;
+            document.addEventListener('keydown',e=>{
+                // Esc — close any open modal
+                if(e.key==='Escape'){
+                    if(this.state.showTodayHistory){this.state.showTodayHistory=false;this.render();return;}
+                    if(this.state.showReceipt){this.closeReceipt();return;}
+                    if(this.state.showSweetness){this.state.showSweetness=false;this.state.sweetnessProduct=null;this.render();return;}
+                    if(this.state.showSettings){this.state.showSettings=false;this.render();return;}
+                    if(this.state.showUserMgmt){this.state.showUserMgmt=false;this.state.showAddUser=false;this.render();return;}
+                    if(this.state.showProductMgmt){this.state.showProductMgmt=false;this.state.showAddProduct=false;this.state.editProductId=null;this.render();return;}
+                    if(this.state.showDemoGenerator){this.state.showDemoGenerator=false;this.render();return;}
+                    if(this.state.showImageMgmt){this.state.showImageMgmt=false;this.state.imageProduct=null;this.render();return;}
+                }
+                // Enter — checkout (only on POS view, no modal open, cart has items, not focused on input)
+                if(e.key==='Enter'){
+                    const tag=document.activeElement?.tagName;
+                    if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT')return;
+                    const anyModal=this.state.showReceipt||this.state.showSweetness||this.state.showSettings||this.state.showUserMgmt||this.state.showProductMgmt||this.state.showDemoGenerator||this.state.showImageMgmt||this.state.showTodayHistory;
+                    if(anyModal)return;
+                    if(this.state.currentView==='pos'&&this.state.cart.length>0){
+                        e.preventDefault();
+                        this.checkout();
+                    }
+                }
+            });
+        }
     }
 }
 
