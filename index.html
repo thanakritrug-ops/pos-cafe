@@ -257,8 +257,10 @@ class POSApp {
             exportYear:String(new Date().getFullYear()),
             googleSheetUrl:localStorage.getItem('googleSheetUrl')||'',
             autoExportSheets:localStorage.getItem('autoExportSheets')==='true',
-            supabaseUrl:localStorage.getItem('supabaseUrl')||'',
-            supabaseKey:localStorage.getItem('supabaseKey')||'',
+            // ====== ใส่ค่าจาก Supabase → Settings → API ======
+            supabaseUrl:'https://osxflpaowdolzemujjul.storage.supabase.co/storage/v1/s3',
+            supabaseKey:'sb_publishable_MdGqJKgNzfHw9Vr_5SLQfQ_S_x_wE96',
+            // =================================================
             showDemoGenerator:false, demoMonths:3, demoOrdersPerDay:'15-30', demoPeakHour:true,
             // New
             showReceipt:false, lastOrder:null, loginError:'',
@@ -381,6 +383,16 @@ class POSApp {
         this.shopLogo = localStorage.getItem('pos_shop_logo') || null;
         this.shopName = localStorage.getItem('pos_shop_name') || 'POS Café Pro';
         this.loadOrders();
+
+        // Intercept saveUsers เพื่อ sync ขึ้น Supabase อัตโนมัติ
+        const _origSaveUsers = this.auth.saveUsers.bind(this.auth);
+        this.auth.saveUsers = () => { _origSaveUsers(); this.syncConfigToSupabase('users', this.auth.users); };
+
+        // ถ้ามี Supabase อยู่แล้ว ให้โหลดข้อมูลและเริ่ม polling ทันที
+        if(this.state.supabaseUrl && this.state.supabaseKey) {
+            this.loadFromSupabase();
+            this.startPolling();
+        }
     }
 
     // ==================== IMAGE MANAGEMENT ====================
@@ -478,15 +490,111 @@ class POSApp {
     }
 
     // ==================== SUPABASE ====================
-    async syncToSupabase(order) {
-        const url = this.state.supabaseUrl, key = this.state.supabaseKey;
-        if(!url||!key||!navigator.onLine) return;
+    // ==================== SUPABASE ENGINE ====================
+    async _supaFetch(path, options={}) {
+        const url=this.state.supabaseUrl, key=this.state.supabaseKey;
+        if(!url||!key) return null;
         try {
-            await fetch(`${url}/rest/v1/orders`, {
-                method:'POST', headers:{'Content-Type':'application/json','apikey':key,'Authorization':`Bearer ${key}`,'Prefer':'return=minimal'},
-                body: JSON.stringify({id:order.id,timestamp:order.timestamp,items:order.items,subtotal:order.subtotal,total_cost:order.totalCost,discount:order.discount,vat:order.vat,total:order.total,profit:order.profit,staff_id:order.staffId||'',staff_name:order.staffName||''})
-            });
-        } catch(e) { console.log('Supabase sync error:', e); }
+            const res=await fetch(`${url}/rest/v1/${path}`,{...options,headers:{'Content-Type':'application/json','apikey':key,'Authorization':`Bearer ${key}`,...(options.headers||{})}});
+            if(!res.ok){console.warn('[Supa]',path,res.status,await res.text().catch(()=>'')); return null;}
+            if(options.method&&options.method!=='GET') return true;
+            return await res.json();
+        } catch(e){console.warn('[Supa] fetch error',e); return null;}
+    }
+
+    async syncToSupabase(order) {
+        if(!this.state.supabaseUrl||!this.state.supabaseKey||!navigator.onLine) return;
+        await this._supaFetch('orders',{
+            method:'POST',
+            headers:{'Prefer':'resolution=merge-duplicates'},
+            body:JSON.stringify({id:order.id,timestamp:order.timestamp,items:order.items,subtotal:order.subtotal,total_cost:order.totalCost,discount:order.discount,vat:order.vat,total:order.total,profit:order.profit,staff_id:order.staffId||'',staff_name:order.staffName||'',payment_method:order.paymentMethod||'cash'})
+        });
+    }
+
+    async deleteOrderFromSupabase(id) {
+        await this._supaFetch(`orders?id=eq.${id}`,{method:'DELETE'});
+    }
+
+    async _supaUpsertConfig(key,value) {
+        const v=typeof value==='string'?value:JSON.stringify(value);
+        return this._supaFetch('pos_config',{
+            method:'POST',
+            headers:{'Prefer':'resolution=merge-duplicates'},
+            body:JSON.stringify({key,value:v,updated_at:new Date().toISOString()})
+        });
+    }
+
+    async syncConfigToSupabase(key,value) {
+        if(!this.state.supabaseUrl||!this.state.supabaseKey||!navigator.onLine) return;
+        await this._supaUpsertConfig(key,value);
+    }
+
+    async loadFromSupabase() {
+        if(!this.state.supabaseUrl||!this.state.supabaseKey||!navigator.onLine) return;
+        console.log('[Supa] กำลังโหลดข้อมูลจาก Supabase...');
+
+        // Load config (products, users, settings, shop info)
+        const cfg=await this._supaFetch('pos_config?select=key,value');
+        if(cfg) {
+            for(const row of cfg) {
+                try {
+                    if(row.key==='products'){const p=JSON.parse(row.value);if(p&&p.length>0){this.products=p;localStorage.setItem('pos_products_custom',row.value);}}
+                    else if(row.key==='users'){const u=JSON.parse(row.value);if(u&&u.length>0){this.auth.users=u;localStorage.setItem('pos_users',row.value);}}
+                    else if(row.key==='shop_name'){this.shopName=row.value;localStorage.setItem('pos_shop_name',row.value);}
+                    else if(row.key==='shop_logo'&&row.value){this.shopLogo=row.value;localStorage.setItem('pos_shop_logo',row.value);}
+                    else if(row.key==='google_sheet_url'){this.state.googleSheetUrl=row.value;localStorage.setItem('googleSheetUrl',row.value);}
+                    else if(row.key==='auto_export_sheets'){this.state.autoExportSheets=row.value==='true';localStorage.setItem('autoExportSheets',row.value);}
+                } catch(e){}
+            }
+        }
+
+        // Load orders from Supabase
+        const rows=await this._supaFetch('orders?select=*&order=timestamp.desc&limit=20000');
+        if(rows&&rows.length>0) {
+            this.state.orders=rows.map(o=>({id:o.id,timestamp:o.timestamp,items:o.items,subtotal:o.subtotal,totalCost:o.total_cost,discount:o.discount,vat:o.vat,total:o.total,profit:o.profit,staffId:o.staff_id,staffName:o.staff_name,paymentMethod:o.payment_method||'cash'}));
+            this._saveBatch(this.state.orders);
+        }
+
+        this._lastSyncTime=new Date().toISOString();
+        this.render();
+        console.log('[Supa] โหลดสำเร็จ');
+    }
+
+    startPolling() {
+        if(this._pollTimer) clearInterval(this._pollTimer);
+        this._lastSyncTime=this._lastSyncTime||new Date().toISOString();
+        this._pollTimer=setInterval(async()=>{
+            if(!this.state.supabaseUrl||!this.state.supabaseKey||!navigator.onLine) return;
+            const since=this._lastSyncTime;
+            this._lastSyncTime=new Date().toISOString();
+
+            // New/updated orders since last poll
+            const newOrders=await this._supaFetch(`orders?select=*&timestamp=gt.${encodeURIComponent(since)}&order=timestamp.desc`);
+            if(newOrders&&newOrders.length>0){
+                let changed=false;
+                for(const o of newOrders){
+                    const mapped={id:o.id,timestamp:o.timestamp,items:o.items,subtotal:o.subtotal,totalCost:o.total_cost,discount:o.discount,vat:o.vat,total:o.total,profit:o.profit,staffId:o.staff_id,staffName:o.staff_name,paymentMethod:o.payment_method||'cash'};
+                    const idx=this.state.orders.findIndex(x=>x.id===o.id);
+                    if(idx<0){this.state.orders.unshift(mapped);this.updateOrderById(mapped);}
+                    else{this.state.orders[idx]=mapped;this.updateOrderById(mapped);}
+                    changed=true;
+                }
+                if(changed) this.render();
+            }
+
+            // Config changes (products, users)
+            const cfg=await this._supaFetch('pos_config?select=key,value&key=in.(products,users)');
+            if(cfg){
+                let cfgChanged=false;
+                for(const row of cfg){
+                    try{
+                        if(row.key==='products'){const p=JSON.parse(row.value);if(JSON.stringify(p)!==JSON.stringify(this.products)){this.products=p;cfgChanged=true;}}
+                        else if(row.key==='users'){const u=JSON.parse(row.value);if(JSON.stringify(u)!==JSON.stringify(this.auth.users)){this.auth.users=u;}}
+                    }catch(e){}
+                }
+                if(cfgChanged) this.render();
+            }
+        },30000); // ซิงค์ทุก 30 วินาที
     }
 
     // ==================== CART ACTIONS ====================
@@ -867,7 +975,7 @@ class POSApp {
                 `:''}
                 ${activeTab==='supabase'?`
                     <div class="mb-4 p-3 rounded-lg ${hasSupa?'bg-green-50 border border-green-200':'bg-gray-50 border border-gray-200'}">
-                        <span class="text-sm">${hasSupa?'🟢 เชื่อมต่อ Supabase แล้ว':'⚪ ยังไม่ได้ตั้งค่า Supabase'}</span>
+                        <span class="text-sm">${hasSupa?'🟢 เชื่อมต่อ Supabase แล้ว — ซิงค์ทุก 30 วินาที':'⚪ ยังไม่ได้ตั้งค่า Supabase'}</span>
                     </div>
                     <div class="space-y-4 mb-5">
                         <div><label class="block text-sm font-bold mb-2">🔗 Supabase URL</label>
@@ -876,11 +984,12 @@ class POSApp {
                         <input type="text" id="supabase-key" value="${this.state.supabaseKey}" placeholder="eyJhbGciOiJIUzI1NiIsInR5c..." class="w-full px-4 py-2.5 border-2 rounded-xl text-sm focus:border-teal-500 focus:outline-none"/></div>
                     </div>
                     <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-5">
-                        <div class="font-bold text-sm text-blue-800 mb-2">📋 ขั้นตอนตั้งค่า Supabase</div>
+                        <div class="font-bold text-sm text-blue-800 mb-2">📋 ขั้นตอนตั้งค่า Supabase (ครั้งแรกครั้งเดียว)</div>
                         <div class="text-xs text-blue-700 space-y-1">
                             <p>1. ไปที่ <a href="https://supabase.com" target="_blank" class="underline font-bold">supabase.com</a> → สร้าง project ใหม่ (ฟรี)</p>
                             <p>2. ไปที่ <strong>SQL Editor</strong> และรัน SQL นี้:</p>
-                            <pre class="bg-gray-900 text-green-400 p-3 rounded-lg text-xs mt-2 overflow-x-auto">CREATE TABLE orders (
+                            <pre class="bg-gray-900 text-green-400 p-3 rounded-lg text-xs mt-2 overflow-x-auto">-- ตาราง orders
+CREATE TABLE orders (
   id bigint PRIMARY KEY,
   timestamp timestamptz,
   items jsonb,
@@ -891,13 +1000,28 @@ class POSApp {
   total numeric,
   profit numeric,
   staff_id text,
-  staff_name text
-);</pre>
-                            <p class="mt-2">3. ไปที่ <strong>Settings → API</strong> → คัดลอก URL และ anon key</p>
+  staff_name text,
+  payment_method text DEFAULT 'cash'
+);
+
+-- ตาราง pos_config (สินค้า / users / settings)
+CREATE TABLE pos_config (
+  key text PRIMARY KEY,
+  value text,
+  updated_at timestamptz DEFAULT now()
+);
+
+-- เปิด Public Access (Row Level Security off)
+ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pos_config ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "allow_all_orders" ON orders FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "allow_all_config" ON pos_config FOR ALL USING (true) WITH CHECK (true);</pre>
+                            <p class="mt-2">3. ไปที่ <strong>Settings → API</strong> → คัดลอก URL และ anon key มาใส่ด้านบน</p>
+                            <p class="mt-1 text-green-700 font-bold">✅ หลังกด "เชื่อมต่อ" ข้อมูลจะซิงค์ข้ามเครื่องอัตโนมัติ</p>
                         </div>
                     </div>
                     <div class="flex gap-3">
-                        <button class="save-supabase flex-1 py-3 btn-gold rounded-xl font-bold export-action-btn">☁️ บันทึก Supabase</button>
+                        <button class="save-supabase flex-1 py-3 btn-gold rounded-xl font-bold export-action-btn">☁️ เชื่อมต่อ Supabase</button>
                         <button class="close-settings px-5 py-3 border-2 border-gray-200 rounded-xl font-medium">ปิด</button>
                     </div>
                 `:''}
@@ -1548,7 +1672,7 @@ class POSApp {
     }
 
     // ==================== PRODUCT MANAGEMENT MODAL ====================
-    saveProducts() { try{localStorage.setItem('pos_products_custom',JSON.stringify(this.products));}catch(e){alert('⚠️ บันทึกสินค้าไม่สำเร็จ');} }
+    saveProducts() { try{localStorage.setItem('pos_products_custom',JSON.stringify(this.products));}catch(e){alert('⚠️ บันทึกสินค้าไม่สำเร็จ');} this.syncConfigToSupabase('products',this.products); }
 
     renderProductMgmtModal() {
         const cats=this.categories;
@@ -1702,8 +1826,8 @@ class POSApp {
         const saveLogoBtn = document.getElementById('save-logo-btn');
         if (saveLogoBtn) saveLogoBtn.addEventListener('click', () => {
             const name = document.getElementById('shop-name-input')?.value.trim();
-            if (name) { this.shopName = name; localStorage.setItem('pos_shop_name', name); }
-            if (this._pendingLogo !== undefined) { this.shopLogo = this._pendingLogo; if(this._pendingLogo) localStorage.setItem('pos_shop_logo', this._pendingLogo); else localStorage.removeItem('pos_shop_logo'); this._pendingLogo = undefined; }
+            if (name) { this.shopName = name; localStorage.setItem('pos_shop_name', name); this.syncConfigToSupabase('shop_name', name); }
+            if (this._pendingLogo !== undefined) { this.shopLogo = this._pendingLogo; if(this._pendingLogo) { localStorage.setItem('pos_shop_logo', this._pendingLogo); this.syncConfigToSupabase('shop_logo', this._pendingLogo); } else { localStorage.removeItem('pos_shop_logo'); this.syncConfigToSupabase('shop_logo',''); } this._pendingLogo = undefined; }
             this.state.showSettings = false; this.render(); alert('✅ บันทึกโลโก้และชื่อร้านแล้ว!');
         });
         const removeLogoBtn = document.getElementById('remove-logo-btn');
@@ -1715,13 +1839,13 @@ class POSApp {
         document.querySelectorAll('[data-settings-tab]').forEach(el=>el.addEventListener('click',e=>{this.state.settingsTab=e.currentTarget.dataset.settingsTab;this.render();}));
         document.querySelectorAll('.close-settings').forEach(b=>b.addEventListener('click',()=>{this.state.showSettings=false;this.render();}));
         const sv=document.querySelector('.save-settings');if(sv)sv.addEventListener('click',()=>{
-            const u=document.getElementById('google-sheet-url').value;this.state.googleSheetUrl=u;localStorage.setItem('googleSheetUrl',u);
-            const ae=document.getElementById('auto-export-toggle');if(ae){this.state.autoExportSheets=ae.checked;localStorage.setItem('autoExportSheets',ae.checked);}
+            const u=document.getElementById('google-sheet-url').value;this.state.googleSheetUrl=u;localStorage.setItem('googleSheetUrl',u);this.syncConfigToSupabase('google_sheet_url',u);
+            const ae=document.getElementById('auto-export-toggle');if(ae){this.state.autoExportSheets=ae.checked;localStorage.setItem('autoExportSheets',ae.checked);this.syncConfigToSupabase('auto_export_sheets',String(ae.checked));}
             this.state.showSettings=false;alert(`✅ บันทึกเรียบร้อย!`);this.render();
         });
         const ae=document.getElementById('auto-export-toggle');if(ae)ae.addEventListener('change',e=>{this.state.autoExportSheets=e.target.checked;localStorage.setItem('autoExportSheets',e.target.checked);});
         const tb=document.querySelector('.test-sheets-btn');if(tb)tb.addEventListener('click',async()=>{if(!this.state.googleSheetUrl){alert('⚠️ ใส่ URL ก่อน');return;}try{const now=new Date();await fetch(this.state.googleSheetUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:[{date:now.toLocaleDateString('th-TH'),time:now.toLocaleTimeString('th-TH'),category:'TEST',item:'🧪 ทดสอบ',quantity:1,price:0,cost:0,subtotal:'0',discount:'0',vat:'0',total:'0',profit:'0',staff:'test'}],month:'test'})});alert('✅ ส่งสำเร็จ! เปิด Google Sheet ตรวจสอบ');}catch(e){alert('❌ '+e.message);}});
-        const ssv=document.querySelector('.save-supabase');if(ssv)ssv.addEventListener('click',()=>{this.state.supabaseUrl=document.getElementById('supabase-url').value;this.state.supabaseKey=document.getElementById('supabase-key').value;localStorage.setItem('supabaseUrl',this.state.supabaseUrl);localStorage.setItem('supabaseKey',this.state.supabaseKey);this.state.showSettings=false;alert('☁️ บันทึก Supabase เรียบร้อย!');this.render();});
+        const ssv=document.querySelector('.save-supabase');if(ssv)ssv.addEventListener('click',async()=>{this.state.supabaseUrl=document.getElementById('supabase-url').value;this.state.supabaseKey=document.getElementById('supabase-key').value;localStorage.setItem('supabaseUrl',this.state.supabaseUrl);localStorage.setItem('supabaseKey',this.state.supabaseKey);this.state.showSettings=false;this.render();await this.loadFromSupabase();this.startPolling();alert('☁️ เชื่อมต่อ Supabase สำเร็จ! ซิงค์ข้อมูลเรียบร้อย');});
         // User management
         const cum=document.querySelector('.close-user-mgmt');if(cum)cum.addEventListener('click',()=>{this.state.showUserMgmt=false;this.state.showAddUser=false;this.render();});
         const aub=document.querySelector('.add-user-btn');if(aub)aub.addEventListener('click',()=>{this.state.showAddUser=true;this.render();});
@@ -1899,6 +2023,7 @@ class POSApp {
                         const prof=tot-tc;
                         this.state.orders[idx]={...o,items:editItems,subtotal:sub,totalCost:tc,vat,total:tot,profit:prof};
                         this.updateOrderById(this.state.orders[idx]);
+                        this.syncToSupabase(this.state.orders[idx]);
                     }
                     this.state.showEditOrder=false;this.state.editOrderId=null;
                     alert('✅ แก้ไขออเดอร์สำเร็จ!');this.render();
@@ -1914,6 +2039,7 @@ class POSApp {
             if(o&&confirm(`ยืนยันยกเลิกออเดอร์ #${String(oid).slice(-5)}?\n฿${o.total.toFixed(0)} — ${o.items.map(i=>i.name).join(', ')}`)){
                 this.state.orders=this.state.orders.filter(x=>x.id!==oid);
                 this.deleteOrderById(oid);
+                this.deleteOrderFromSupabase(oid);
                 this.render();
             }
         }));
