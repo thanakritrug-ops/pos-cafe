@@ -255,10 +255,10 @@ class POSApp {
             exportWeek:this.getISOWeek(new Date()),
             exportMonth:`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`,
             exportYear:String(new Date().getFullYear()),
-            googleSheetUrl:localStorage.getItem('googleSheetUrl')||'',
+            googleSheetUrl:localStorage.getItem('googleSheetUrl')||'https://script.google.com/macros/s/AKfycbzdktaUmOpjMt_18ZkZHxJSr_xwlN-yFkPM3975MJ3QAyqaGHyPkkTAi51dWR6C4x4ruQ/exec',
             autoExportSheets:localStorage.getItem('autoExportSheets')==='true',
-            supabaseUrl: localStorage.getItem('supabaseUrl') || 'https://osxflpaowdolzemujjul.storage.supabase.co/storage/v1/s3',
-            supabaseKey: localStorage.getItem('supabaseKey') || 'sb_publishable_MdGqJKgNzfHw9Vr_5SLQfQ_S_x_wE96',
+            supabaseUrl: localStorage.getItem('supabaseUrl') || 'https://supabase.com/dashboard/project/xqngcaxstmwivaxeatur/settings/api-keys',
+            supabaseKey: localStorage.getItem('supabaseKey') || 'sb_publishable_9afMzestxvx03XzqjmFMjg_2iikhvSY',
             showDemoGenerator:false, demoMonths:3, demoOrdersPerDay:'15-30', demoPeakHour:true,
             // New
             showReceipt:false, lastOrder:null, loginError:'',
